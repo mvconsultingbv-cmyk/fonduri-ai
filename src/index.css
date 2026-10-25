@@ -1,0 +1,144 @@
+:root {
+  --fundal: #f4f6f9;
+  --card: #ffffff;
+  --text: #1b2430;
+  --gri: #6b7684;
+  --linie: #e3e7ed;
+  --navy: #1f3a5f;
+  --navy-2: #2d5385;
+  --verde: #1f7a4d;
+  --verde-f: #e7f4ec;
+  --galben: #8a5a00;
+  --galben-f: #fff6e0;
+  --rosu: #b42318;
+  --rosu-f: #fdecea;
+  --albastru: #1d4f91;
+  --albastru-f: #e9f0fb;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  color: var(--text);
+  background: var(--fundal);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fundal); }
+h1, h2 { margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.08rem; }
+a { color: inherit; text-decoration: none; }
+
+/* Marca */
+.marca { display: flex; align-items: center; gap: 12px; }
+.marca-semn { width: 40px; height: 40px; border-radius: 10px; background: var(--navy); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 20px; flex: none; }
+.marca-nume { font-weight: 700; font-size: 1.05rem; }
+.marca-sub { color: var(--gri); font-size: 0.85rem; }
+.marca.mic .marca-semn { width: 32px; height: 32px; font-size: 16px; border-radius: 8px; }
+
+/* Intrare */
+.login-pagina { min-height: 100vh; display: grid; place-items: center; padding: 16px; background: linear-gradient(160deg, #e8edf4, #f4f6f9 60%); }
+.login-card { width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--linie); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 10px 30px rgba(31, 58, 95, 0.08); }
+.login-card .marca { margin-bottom: 8px; }
+label { display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; font-weight: 600; color: #3a4553; }
+input { font: inherit; padding: 10px 12px; border: 1px solid #cfd6df; border-radius: 8px; background: #fff; }
+input:focus { outline: 2px solid var(--navy-2); outline-offset: 0; border-color: transparent; }
+.buton { font: inherit; font-weight: 600; background: var(--navy); color: #fff; border: 0; border-radius: 8px; padding: 11px 16px; cursor: pointer; }
+.buton:hover { background: var(--navy-2); }
+.buton:disabled { opacity: 0.6; cursor: wait; }
+.buton-text { font: inherit; background: none; border: 1px solid var(--linie); border-radius: 8px; padding: 6px 12px; cursor: pointer; color: var(--text); }
+.buton-text:hover { background: var(--fundal); }
+.nota { color: var(--gri); font-size: 0.82rem; margin: 8px 0 0; }
+
+/* Cadru */
+.bara { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--linie); display: flex; align-items: center; justify-content: space-between; padding: 10px 24px; gap: 12px; }
+.bara-dreapta { display: flex; align-items: center; gap: 14px; }
+.cine { font-size: 0.88rem; color: var(--gri); display: flex; gap: 8px; align-items: center; }
+.continut { max-width: 1180px; margin: 0 auto; padding: 24px 24px 64px; }
+.titlu-pagina { margin-bottom: 20px; }
+.titlu-pagina p { color: var(--gri); margin: 6px 0 0; }
+.inapoi { display: inline-block; color: var(--gri); font-size: 0.9rem; margin-bottom: 14px; }
+.inapoi:hover { color: var(--navy); }
+
+/* Lista contracte */
+.grila-contracte { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.card-contract { background: var(--card); border: 1px solid var(--linie); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 6px; transition: border-color .15s, box-shadow .15s; }
+.card-contract:hover { border-color: var(--navy-2); box-shadow: 0 6px 18px rgba(31, 58, 95, 0.08); }
+.card-sus { display: flex; justify-content: space-between; align-items: center; }
+.cod { font-size: 0.78rem; font-weight: 700; color: var(--navy-2); letter-spacing: 0.06em; text-transform: uppercase; }
+.firma { font-weight: 700; font-size: 1.05rem; }
+.detaliu { color: var(--gri); font-size: 0.88rem; }
+.valoare { font-size: 1.35rem; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.deschide { margin-top: 8px; color: var(--navy-2); font-weight: 600; font-size: 0.9rem; }
+
+/* Etichete și stări */
+.stare, .eticheta { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: #eef1f5; color: #3a4553; white-space: nowrap; }
+.eticheta + .eticheta { margin-left: 6px; }
+.stare-activ, .eticheta.verde { background: var(--verde-f); color: var(--verde); }
+.stare-suspendat, .eticheta.galben { background: var(--galben-f); color: var(--galben); }
+.stare-reziliat, .eticheta.rosu { background: var(--rosu-f); color: var(--rosu); }
+.stare-finalizat { background: var(--albastru-f); color: var(--albastru); }
+
+/* Alerte */
+.alerta { padding: 10px 14px; border-radius: 8px; font-size: 0.9rem; border-left: 4px solid; }
+.alerta.rosu { background: var(--rosu-f); border-color: var(--rosu); color: #7a1a12; }
+.alerta.galben { background: var(--galben-f); border-color: #d99a00; color: #5c3d00; }
+.alerta.albastru { background: var(--albastru-f); border-color: var(--albastru); color: #163d70; }
+.alerta.verde { background: var(--verde-f); border-color: var(--verde); color: #145234; }
+.atentionari { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+
+/* Tablou de bord */
+.antet { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.antet h1 { margin: 4px 0; }
+.cifre { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+.cifra { background: var(--card); border: 1px solid var(--linie); border-radius: 12px; padding: 16px; }
+.cifra.accent { background: var(--navy); border-color: var(--navy); color: #fff; }
+.cifra-eticheta { font-size: 0.82rem; color: var(--gri); font-weight: 600; }
+.cifra.accent .cifra-eticheta, .cifra.accent .cifra-sub { color: #c4d2e6; }
+.cifra-valoare { font-size: 1.4rem; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.cifra-sub { font-size: 0.8rem; color: var(--gri); margin-top: 4px; }
+.bloc { background: var(--card); border: 1px solid var(--linie); border-radius: 12px; padding: 18px; margin-bottom: 20px; }
+.bloc-titlu { margin-bottom: 12px; }
+.bloc-titlu p { margin: 4px 0 0; color: var(--gri); font-size: 0.86rem; }
+.doua-coloane { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.doua-coloane .bloc { margin-bottom: 20px; }
+
+/* Tabele */
+.tabel-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th { text-align: left; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gri); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--linie); white-space: nowrap; }
+td { padding: 10px; border-bottom: 1px solid #eef1f5; vertical-align: top; }
+tfoot td { font-weight: 700; border-top: 2px solid var(--linie); border-bottom: 0; }
+.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tare { font-weight: 600; }
+.mic { font-size: 0.78rem; }
+.gri { color: var(--gri); }
+.mono { font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 0.82rem; }
+.rosu-text { color: var(--rosu); }
+.rand-rosu td { background: #fff7f6; }
+.rand-curent td { background: #f6f9fd; }
+.gol-rand { text-align: center; color: var(--gri); padding: 18px; }
+.bara-progres { height: 6px; background: #eef1f5; border-radius: 99px; overflow: hidden; min-width: 80px; }
+.bara-progres span { display: block; height: 100%; background: var(--navy-2); }
+.lant + .lant { margin-top: 16px; }
+.lant-cont { font-weight: 600; margin-bottom: 6px; }
+
+.gol { color: var(--gri); padding: 32px; text-align: center; background: var(--card); border: 1px dashed #cfd6df; border-radius: 12px; }
+.gol.mic-gol { padding: 16px; font-size: 0.9rem; }
+.gol.ecran { border: 0; background: none; margin-top: 30vh; }
+
+@media (max-width: 900px) {
+  .cifre { grid-template-columns: 1fr 1fr; }
+  .doua-coloane { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .continut { padding: 16px 16px 48px; }
+  .bara { padding: 10px 16px; }
+  .cifre { grid-template-columns: 1fr; }
+  .antet { flex-direction: column; }
+  .cine span:first-child { display: none; }
+}
+@media (max-width: 560px) {
+  td:first-child { min-width: 170px; }
+  .mono { white-space: nowrap; }
+  table { font-size: 0.85rem; }
+}
