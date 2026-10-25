@@ -15,6 +15,8 @@ type Op = {
   aferenta_proiect: boolean | null; in_perioada_mixta: boolean; operatiune_parinte_id: string | null
   nr_comisioane: number; suma_comisioane: number; cine: string | null; detalii: string | null; descriere_banca: string | null
   decontat: number; alocari: Alocare[]
+  legat_echipament: number; echipamente: { id: string; echipament_id: string; denumire: string; suma: number }[]
+  documentat: number; documente: { id: string; document_id: string; numar: string | null; tip: string; suma: number }[]
 }
 type Pozitie = { id: string; capitol: string; denumire: string; mod_calcul: string }
 
@@ -62,7 +64,7 @@ export default function Operatiuni() {
     const toate: Op[] = []
     for (let de = 0; ; de += 1000) {
       const r = await supabase.from('v_operatiuni_validare')
-        .select('id,cont_id,iban,moneda,cont_denumire,extras_numar,rand_extras,data_operatiune,sens,suma,tip_propus,tip_confirmat,tip,aferenta_proiect,in_perioada_mixta,operatiune_parinte_id,nr_comisioane,suma_comisioane,cine,detalii,descriere_banca,decontat,alocari')
+        .select('id,cont_id,iban,moneda,cont_denumire,extras_numar,rand_extras,data_operatiune,sens,suma,tip_propus,tip_confirmat,tip,aferenta_proiect,in_perioada_mixta,operatiune_parinte_id,nr_comisioane,suma_comisioane,cine,detalii,descriere_banca,decontat,alocari,legat_echipament,echipamente,documentat,documente')
         .eq('contract_id', id).order('data_operatiune').order('rand_extras').range(de, de + 999)
       if (r.error) { setEroare('Operațiunile nu au putut fi citite.'); return }
       toate.push(...(r.data as unknown as Op[]))
@@ -88,7 +90,7 @@ export default function Operatiuni() {
   const deFacut = useMemo(() => ({
     mixt: principale.filter(o => o.in_perioada_mixta && o.aferenta_proiect === null),
     tip: principale.filter(o => !o.tip_confirmat),
-    alocare: principale.filter(o => o.sens === 'debit' && o.aferenta_proiect === true && DE_ALOCAT.has(o.tip ?? '') && Number(o.decontat) < Number(o.suma)),
+    alocare: principale.filter(o => o.sens === 'debit' && o.aferenta_proiect === true && DE_ALOCAT.has(o.tip ?? '') && Number(o.decontat) + Number(o.legat_echipament) < Number(o.suma) - 0.004),
     toate: principale,
   }), [principale])
 
@@ -204,7 +206,7 @@ export default function Operatiuni() {
               {vizibile.map(o => {
                 const fees = comisioane.get(o.id) ?? []
                 const alocabil = o.sens === 'debit' && o.aferenta_proiect === true && !FARA_ALOCARE.has(o.tip ?? '')
-                const rest = Number(o.suma) - Number(o.decontat)
+                const rest = Number(o.suma) - Number(o.decontat) - Number(o.legat_echipament)
                 return (
                   <Fragment key={o.id}>
                     <tr className={selectate.has(o.id) ? 'rand-selectat' : ''}>
@@ -215,6 +217,9 @@ export default function Operatiuni() {
                           <span className="tare">{o.cine ?? scurt(o.descriere_banca)}</span>
                           {o.detalii && <div className="mic gri">{o.detalii}</div>}
                         </button>
+                        {o.sens === 'debit' && o.aferenta_proiect === true && DE_ALOCAT.has(o.tip ?? '') && (
+                          Number(o.documentat) >= Number(o.suma) - 0.004 ? <div className="mic verde-text">✓ are document</div>
+                          : Number(o.documentat) > 0 ? <div className="mic gri">document parțial</div> : <div className="mic rosu-text">fără document</div>)}
                         {fees.length > 0 && <div className="mic gri">+ comision {bani(fees.reduce((a, f) => a + Number(f.suma), 0), o.moneda)}</div>}
                       </td>
                       <td>
@@ -240,8 +245,9 @@ export default function Operatiuni() {
                       </td>
                       <td>
                         {o.alocari.map(a => <div key={a.id} className="mic"><span className="eticheta albastru-e">{a.capitol}</span> {num(a.suma)}</div>)}
+                        {o.echipamente.map(e => <div key={e.id} className="mic" title={`Echipament: ${e.denumire} – pe proiect intră doar amortizarea`}><span className="eticheta galben-e">C.2</span> {num(e.suma)}</div>)}
                         {alocabil && rest > 0.004 && <button className="link-mic" onClick={() => setDeschis(deschis === o.id ? null : o.id)}>{o.alocari.length ? `+ rest ${num(rest)}` : 'Alocă'}</button>}
-                        {!alocabil && o.alocari.length === 0 && (
+                        {!alocabil && o.alocari.length === 0 && o.echipamente.length === 0 && (
                           o.sens === 'debit' && o.aferenta_proiect === true && PE_PONTAJ.has(o.tip ?? '') ? <span className="mic gri">A · prin pontaj</span>
                           : o.sens === 'debit' && o.aferenta_proiect === true && o.tip === 'comision_bancar' ? <span className="mic gri">E · indirecte</span>
                           : <span className="mic gri">—</span>)}
@@ -251,7 +257,7 @@ export default function Operatiuni() {
                       <tr className="rand-detaliu">
                         <td />
                         <td colSpan={6}>
-                          <Detaliu key={`${o.id}-${rest}`} o={o} fees={fees} alocabil={alocabil} rest={rest} pozitii={pozAlocabile} lucreaza={lucreaza}
+                          <Detaliu key={`${o.id}-${rest}`} contractId={id!} o={o} fees={fees} alocabil={alocabil} rest={rest} pozitii={pozAlocabile} lucreaza={lucreaza}
                             aloca={(poz, suma) => actiune(() => supabase.rpc('aloca_pe_buget', { p_operatiune: o.id, p_pozitie: poz, p_suma: suma }), 'Alocarea a fost salvată.')}
                             storneaza={(aid) => { if (window.confirm('Stornați această alocare? Rămâne în istoric, dar nu mai contează în buget.')) actiune(() => supabase.rpc('storneaza_alocare', { p_decontare: aid, p_motiv: 'corectat din ecranul de validare' }), 'Alocarea a fost stornată.') }}
                           />
@@ -276,8 +282,8 @@ export default function Operatiuni() {
   )
 }
 
-function Detaliu({ o, fees, alocabil, rest, pozitii, lucreaza, aloca, storneaza }: {
-  o: Op; fees: Op[]; alocabil: boolean; rest: number; pozitii: Pozitie[]; lucreaza: boolean
+function Detaliu({ contractId, o, fees, alocabil, rest, pozitii, lucreaza, aloca, storneaza }: {
+  contractId: string; o: Op; fees: Op[]; alocabil: boolean; rest: number; pozitii: Pozitie[]; lucreaza: boolean
   aloca: (poz: string, suma: number) => void; storneaza: (id: string) => void
 }) {
   const [poz, setPoz] = useState(pozitii[0]?.id ?? '')
@@ -300,6 +306,15 @@ function Detaliu({ o, fees, alocabil, rest, pozitii, lucreaza, aloca, storneaza 
             </div>
           ))}
         </div>
+      )}
+      {o.echipamente.length > 0 && (
+        <div className="mic">Achiziție de echipament (C.2): {o.echipamente.map(e => `${e.denumire} – ${num(e.suma)}`).join(', ')} · pe proiect intră amortizarea. <Link to={`/contract/${contractId}/echipamente`}>vezi echipamentele</Link></div>
+      )}
+      {o.documente.length > 0 && (
+        <div className="mic">Documente: {o.documente.map(d => `${d.numar ?? d.tip} (${num(d.suma)})`).join(', ')} · <Link to={`/contract/${contractId}/documente`}>vezi documentele</Link></div>
+      )}
+      {alocabil && rest > 0.004 && (
+        <div className="mic"><Link className="link-mic" to={`/contract/${contractId}/echipamente?operatiune=${o.id}`}>E un echipament? Înregistrează-l pe C.2 (amortizare) →</Link></div>
       )}
       {alocabil && rest > 0.004 && (
         pozitii.length === 0 ? <div className="mic gri">Contractul nu are capitole care se decontează din plăți.</div> : (

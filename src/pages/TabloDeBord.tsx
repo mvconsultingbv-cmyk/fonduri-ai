@@ -16,11 +16,12 @@ type Sold = { cont_id: string; sold_din_operatiuni: number; sold_ultim_extras: n
 type Capitol = { capitol: string; buget_capitol: number; pondere_procent: number; total_incasat: number; incasat_repartizat: number; cheltuit_eur: number; cheltuit_lei_neconvertit: number; semnal_depasire: boolean }
 type Pozitie = { capitol: string; denumire: string; mod_calcul: string; procent: number | null; ordine: number }
 type Transa = { id: string; numar: number; tip: string; suma_asteptata_eur: number | null; termen: string | null; operatiune_id: string | null }
+type EchSum = { moneda: string; cost_achizitie: number; eligibil_pana_acum: number; eligibil_total: number }
 type Veriga = { extras_id: string; cont_id: string; numar: string; data_inceput: string; data_sfarsit: string; sold_initial: number; sold_final: number; stare_lant: string; nr_operatiuni: number; operatiuni_complete: boolean }
 
 type DateTablou = {
   contract: Contract; perioade: Perioada[]; stari: StarePerioada[]; conturi: Cont[]; solduri: Sold[]
-  capitole: Capitol[]; pozitii: Pozitie[]; transe: Transa[]; lant: Veriga[]
+  capitole: Capitol[]; pozitii: Pozitie[]; transe: Transa[]; lant: Veriga[]; echipamente: EchSum[]
 }
 
 const STARE_LANT: Record<string, { text: string; cls: string }> = {
@@ -48,7 +49,7 @@ export default function TabloDeBord() {
   useEffect(() => {
     if (!id) return
     ;(async () => {
-      const [k, p, sp, c, s, cap, poz, t, l] = await Promise.all([
+      const [k, p, sp, c, s, cap, poz, t, l, ech] = await Promise.all([
         supabase.from('contracte').select('id,numar_contract,cod_proiect,titlu,valoare_finantare_eur,data_inceput,data_sfarsit,stare,organizatii(denumire,cui),programe(denumire,moneda,regula_curs,sursa_curs_referinta)').eq('id', id).maybeSingle(),
         supabase.from('v_curs_perioade').select('perioada,data_inceput,data_sfarsit,curs,nr_zile,provizoriu').eq('contract_id', id).order('perioada'),
         supabase.from('perioade_raportare').select('numar,stare').eq('contract_id', id),
@@ -58,13 +59,14 @@ export default function TabloDeBord() {
         supabase.from('pozitii_buget').select('capitol,denumire,mod_calcul,procent,ordine').eq('contract_id', id).order('ordine'),
         supabase.from('transe').select('id,numar,tip,suma_asteptata_eur,termen,operatiune_id').eq('contract_id', id).order('numar'),
         supabase.from('v_lant_extrase').select('extras_id,cont_id,numar,data_inceput,data_sfarsit,sold_initial,sold_final,stare_lant,nr_operatiuni,operatiuni_complete').eq('contract_id', id).order('data_inceput'),
+        supabase.from('v_echipamente').select('moneda,cost_achizitie,eligibil_pana_acum,eligibil_total').eq('contract_id', id),
       ])
-      const err = [k, p, sp, c, s, cap, poz, t, l].find(r => r.error)
+      const err = [k, p, sp, c, s, cap, poz, t, l, ech].find(r => r.error)
       if (err || !k.data) { setEroare(k.data === null && !err ? 'Contractul nu există sau nu aveți acces la el.' : 'Datele nu au putut fi citite.'); return }
       setD({
         contract: k.data as unknown as Contract, perioade: (p.data ?? []) as Perioada[], stari: (sp.data ?? []) as StarePerioada[],
         conturi: (c.data ?? []) as unknown as Cont[], solduri: (s.data ?? []) as Sold[], capitole: (cap.data ?? []) as Capitol[],
-        pozitii: (poz.data ?? []) as Pozitie[], transe: (t.data ?? []) as Transa[], lant: (l.data ?? []) as Veriga[],
+        pozitii: (poz.data ?? []) as Pozitie[], transe: (t.data ?? []) as Transa[], lant: (l.data ?? []) as Veriga[], echipamente: (ech.data ?? []) as EchSum[],
       })
     })()
   }, [id])
@@ -77,9 +79,13 @@ export default function TabloDeBord() {
 
     const buget = d.capitole.reduce((a, c) => a + Number(c.buget_capitol), 0)
     const incasat = Number(d.capitole[0]?.total_incasat ?? 0)
-    const chEur = d.capitole.reduce((a, c) => a + Number(c.cheltuit_eur), 0)
-    const chLei = d.capitole.reduce((a, c) => a + Number(c.cheltuit_lei_neconvertit), 0)
-    const chEchiv = chEur + (cursCurent ? chLei / cursCurent : 0)
+    // Echipamentele (C.2): „cumpărat” = costul plătit; „cheltuit eligibil” = doar amortizarea lunilor de proiect încheiate.
+    const inEur = (v: number, m: string) => (m === 'EUR' ? v : cursCurent ? v / cursCurent : 0)
+    const ech = {
+      cumparat: d.echipamente.reduce((a, e) => a + inEur(Number(e.cost_achizitie), e.moneda), 0),
+      eligibil: d.echipamente.reduce((a, e) => a + inEur(Number(e.eligibil_pana_acum), e.moneda), 0),
+      eligibilTotal: d.echipamente.reduce((a, e) => a + inEur(Number(e.eligibil_total), e.moneda), 0),
+    }
 
     const conturi = d.conturi.map(c => {
       const s = d.solduri.find(x => x.cont_id === c.id)
@@ -93,13 +99,16 @@ export default function TabloDeBord() {
       const c = d.capitole.find(x => x.capitol === p.capitol)
       const chEurC = Number(c?.cheltuit_eur ?? 0)
       const chLeiC = Number(c?.cheltuit_lei_neconvertit ?? 0)
-      const chEchivC = chEurC + (cursCurent ? chLeiC / cursCurent : 0)
+      const amort = p.mod_calcul === 'amortizare'
+      const chEchivC = amort ? ech.eligibil : chEurC + (cursCurent ? chLeiC / cursCurent : 0)
       const bug = Number(c?.buget_capitol ?? 0)
-      return { ...p, buget: bug, pondere: Number(c?.pondere_procent ?? 0), incasat: Number(c?.incasat_repartizat ?? 0), chLei: chLeiC, chEchiv: chEchivC, ramas: bug - chEchivC, depasire: !!c?.semnal_depasire }
+      return { ...p, amort, buget: bug, pondere: Number(c?.pondere_procent ?? 0), incasat: Number(c?.incasat_repartizat ?? 0), chLei: chLeiC, chEchiv: chEchivC, ramas: bug - chEchivC, depasire: !!c?.semnal_depasire }
     })
 
+    const chLei = capitole.reduce((a, c) => a + (c.amort ? 0 : c.chLei), 0)
+    const chEchiv = capitole.reduce((a, c) => a + c.chEchiv, 0)
     const fara = d.lant.length === 0
-    return { curenta, cursCurent, buget, incasat, chEur, chLei, chEchiv, conturi, disponibilEchiv, capitole, fara }
+    return { curenta, cursCurent, buget, incasat, chLei, chEchiv, ech, conturi, disponibilEchiv, capitole, fara }
   }, [d])
 
   if (eroare) return <><Link to="/" className="inapoi">← Contracte</Link><div className="alerta rosu">{eroare}</div></>
@@ -147,7 +156,11 @@ export default function TabloDeBord() {
               </>}
             </p>
           </div>
-          <Link to={`/contract/${k.id}/operatiuni`} className="buton">Deschide ecranul de validare →</Link>
+          <div className="navigare-contract">
+            <Link to={`/contract/${k.id}/operatiuni`} className="buton">Validarea operațiunilor →</Link>
+            <Link to={`/contract/${k.id}/documente`} className="buton secundar">Facturi și documente</Link>
+            <Link to={`/contract/${k.id}/echipamente`} className="buton secundar">Echipamente C.2</Link>
+          </div>
         </section>
       )}
 
@@ -198,7 +211,9 @@ export default function TabloDeBord() {
                     <td className="n">{num(c.buget)}</td>
                     <td className="n">{procent(c.pondere)}</td>
                     <td className="n">{num(c.incasat)}</td>
-                    <td className="n">{num(c.chEchiv)}{c.chLei > 0 && <div className="mic gri">{bani(c.chLei, 'RON')}</div>}</td>
+                    <td className="n">{num(c.chEchiv)}
+                      {c.amort ? (calc.ech.cumparat > 0 && <div className="mic gri" title="Costul echipamentelor cumpărate; pe proiect intră doar amortizarea">cumpărat {num(calc.ech.cumparat)}<br />eligibil la final {num(calc.ech.eligibilTotal)}</div>)
+                        : c.chLei > 0 && <div className="mic gri">{bani(c.chLei, 'RON')}</div>}</td>
                     <td className="n tare">{num(c.ramas)}</td>
                     <td><div className="bara-progres"><span style={{ width: `${pct}%` }} /></div><div className="mic gri">{procent(pct)}</div></td>
                   </tr>
@@ -210,7 +225,7 @@ export default function TabloDeBord() {
             </tfoot>
           </table>
         </div>
-        <p className="nota">Sume în {moneda}. Cheltuielile în lei apar aici convertite estimativ la cursul perioadei curente; în raportare se folosește cursul perioadei în care au fost făcute.</p>
+        <p className="nota">Sume în {moneda}. La C.2 „Cheltuit” e amortizarea eligibilă până acum, nu prețul plătit (prețul apare dedesubt, „cumpărat”). Cheltuielile în lei apar aici convertite estimativ la cursul perioadei curente; în raportare se folosește cursul perioadei în care au fost făcute.</p>
       </section>
 
       <div className="doua-coloane">
