@@ -25,15 +25,17 @@ const TIP: Record<string, string> = {
   restituire: 'Restituire', altele: 'Altele',
 }
 // Tipuri care nu sunt cheltuieli (bani mutați, nu consumați): nu se alocă pe buget.
-const FARA_ALOCARE = new Set(['schimb_valutar', 'transfer_intern', 'transfer_cont_propriu', 'restituire', 'incasare_finantare', 'depunere_numerar', 'dobanda'])
+const FARA_ALOCARE = new Set(['schimb_valutar', 'transfer_intern', 'transfer_cont_propriu', 'restituire', 'incasare_finantare', 'depunere_numerar', 'dobanda', 'plata_salarii', 'plata_taxe', 'comision_bancar'])
+// Salariile și contribuțiile intră pe capitolul A prin pontaje; comisioanele, de regulă, în costurile indirecte (E).
+const PE_PONTAJ = new Set(['plata_salarii', 'plata_taxe'])
 // Ce intră în „de alocat pe capitole”: salariile și contribuțiile merg pe capitolul A prin pontaje (etapa 2), comisioanele la indirecte.
-const DE_ALOCAT = new Set(['plata_furnizor', 'retragere_numerar', 'altele', 'plata_taxe'])
+const DE_ALOCAT = new Set(['plata_furnizor', 'retragere_numerar', 'altele'])
 
 type Vedere = 'mixt' | 'tip' | 'alocare' | 'toate'
 const VEDERI: { cheie: Vedere; titlu: string; explicatie: string }[] = [
   { cheie: 'mixt', titlu: 'Cont mixt: aferent / neaferent', explicatie: 'Operațiunile din conturile vechi, din perioada în care contul a fost folosit și pentru alte activități ale asociației. Pentru fiecare decideți dacă ține de proiect. Comisionul legat de o plată urmează automat decizia plății.' },
   { cheie: 'tip', titlu: 'Tip de confirmat', explicatie: 'Aplicația a citit textul băncii și a propus un tip. Confirmați-l sau schimbați-l. Tipul decide unde poate merge operațiunea mai departe (pe buget, la schimburi, la transferuri).' },
-  { cheie: 'alocare', titlu: 'De alocat pe capitole', explicatie: 'Plăți aferente proiectului, încă nealocate (sau alocate parțial) pe capitolele de buget care se decontează din plăți. Salariile și contribuțiile de salarii merg pe capitolul A prin pontaje, în etapa următoare.' },
+  { cheie: 'alocare', titlu: 'De alocat pe capitole', explicatie: 'Plăți aferente proiectului, încă nealocate (sau alocate parțial) pe capitolele de buget care se decontează din plăți. Salariile și contribuțiile nu apar aici: se decontează pe capitolul A prin pontaje (modul în lucru). Comisioanele bancare sunt acoperite, de regulă, de costurile indirecte (E). Dacă o plată marcată „taxe” e de fapt un serviciu, schimbați-i tipul și va apărea aici.' },
   { cheie: 'toate', titlu: 'Toate operațiunile', explicatie: 'Toate operațiunile din extrasele încărcate, cu filtrele de mai sus.' },
 ]
 
@@ -239,7 +241,10 @@ export default function Operatiuni() {
                       <td>
                         {o.alocari.map(a => <div key={a.id} className="mic"><span className="eticheta albastru-e">{a.capitol}</span> {num(a.suma)}</div>)}
                         {alocabil && rest > 0.004 && <button className="link-mic" onClick={() => setDeschis(deschis === o.id ? null : o.id)}>{o.alocari.length ? `+ rest ${num(rest)}` : 'Alocă'}</button>}
-                        {!alocabil && o.alocari.length === 0 && <span className="mic gri">—</span>}
+                        {!alocabil && o.alocari.length === 0 && (
+                          o.sens === 'debit' && o.aferenta_proiect === true && PE_PONTAJ.has(o.tip ?? '') ? <span className="mic gri">A · prin pontaj</span>
+                          : o.sens === 'debit' && o.aferenta_proiect === true && o.tip === 'comision_bancar' ? <span className="mic gri">E · indirecte</span>
+                          : <span className="mic gri">—</span>)}
                       </td>
                     </tr>
                     {deschis === o.id && (
