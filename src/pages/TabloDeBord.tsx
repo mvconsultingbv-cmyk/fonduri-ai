@@ -34,6 +34,16 @@ export default function TabloDeBord() {
   const { id } = useParams()
   const [d, setD] = useState<DateTablou | null>(null)
   const [eroare, setEroare] = useState<string | null>(null)
+  const [deValidat, setDeValidat] = useState<{ mixt: number; tip: number } | null>(null)
+
+  useEffect(() => {
+    if (!id) return
+    const baza = () => supabase.from('v_operatiuni_validare').select('id', { count: 'exact', head: true }).eq('contract_id', id).is('operatiune_parinte_id', null)
+    Promise.all([
+      baza().eq('in_perioada_mixta', true).is('aferenta_proiect', null),
+      baza().is('tip_confirmat', null),
+    ]).then(([m, t]) => setDeValidat({ mixt: m.count ?? 0, tip: t.count ?? 0 }))
+  }, [id])
 
   useEffect(() => {
     if (!id) return
@@ -125,6 +135,21 @@ export default function TabloDeBord() {
         <Cifra eticheta="Cheltuit (decontat)" valoare={bani(calc.chEchiv, moneda)} sub={calc.chLei ? `din care ${bani(calc.chLei, 'RON')} convertiți estimativ` : 'echivalent la cursul HEAT'} />
         <Cifra eticheta="Bani în conturi acum" valoare={bani(calc.disponibilEchiv, moneda)} sub="echivalent la cursul perioadei curente" accent />
       </section>
+
+      {deValidat && (
+        <section className="bloc validare-bloc">
+          <div>
+            <h2>Validarea operațiunilor</h2>
+            <p className="mic gri">
+              {deValidat.mixt + deValidat.tip === 0 ? 'Toate operațiunile sunt validate.' : <>
+                {deValidat.mixt > 0 && <>{deValidat.mixt} de marcat aferent / neaferent · </>}
+                {deValidat.tip} cu tipul încă neconfirmat
+              </>}
+            </p>
+          </div>
+          <Link to={`/contract/${k.id}/operatiuni`} className="buton">Deschide ecranul de validare →</Link>
+        </section>
+      )}
 
       {atentionari.length > 0 && (
         <section className="atentionari">

@@ -4,6 +4,7 @@ import Layout from './Layout'
 import Login from './pages/Login'
 import Contracte from './pages/Contracte'
 import TabloDeBord from './pages/TabloDeBord'
+import Operatiuni from './pages/Operatiuni'
 
 function Poarta() {
   const { incarcare, sesiune, utilizator, iesire } = useAuth()
@@ -24,6 +25,7 @@ function Poarta() {
       <Route element={<Layout />}>
         <Route index element={<Contracte />} />
         <Route path="contract/:id" element={<TabloDeBord />} />
+        <Route path="contract/:id/operatiuni" element={<Operatiuni />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
