@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { bani, data, num } from '../lib/format'
@@ -9,12 +9,12 @@ import { bani, data, num } from '../lib/format'
 
 type Ech = {
   id: string; denumire: string; moneda: string; cost_achizitie: number; data_punere_functiune: string; durata_amortizare_luni: number
-  procent_utilizare: number; observatii: string | null; document_numar: string | null; prima_luna: string; ultima_luna: string
+  procent_utilizare: number; observatii: string | null; document_id: string | null; document_numar: string | null; prima_luna: string; ultima_luna: string
   amortizare_lunara: number; platit: number; plati: { id: string; operatiune_id: string; suma: number; data: string }[]
   luni_in_proiect: number; eligibil_total: number; luni_scurse: number; eligibil_pana_acum: number
   pe_perioade: { perioada: number; luni: number; eligibil: number }[]
 }
-type Op = { id: string; data_operatiune: string; moneda: string; suma: number; cine: string | null; detalii: string | null; descriere_banca: string | null; decontat: number; legat_echipament: number; documente: { document_id: string; numar: string | null }[] }
+type Op = { id: string; data_operatiune: string; moneda: string; suma: number; cine: string | null; detalii: string | null; descriere_banca: string | null; decontat: number; legat_echipament: number; tva_neeligibila: number; documente: { document_id: string; numar: string | null }[] }
 type Doc = { id: string; numar: string | null; furnizor_denumire: string | null; descriere: string | null; moneda: string; suma_totala: number }
 
 const luna = (d: string) => { const [y, m] = d.split('-'); return `${m}.${y}` }
@@ -30,12 +30,13 @@ export default function Echipamente() {
   const [mesaj, setMesaj] = useState<{ cls: string; text: string } | null>(null)
   const [lucreaza, setLucreaza] = useState(false)
   const [formular, setFormular] = useState<boolean>(!!cauta.get('operatiune'))
+  const [editez, setEditez] = useState<string | null>(null)
 
   const incarca = useCallback(async () => {
     if (!id) return
     const [e, o, d, b] = await Promise.all([
       supabase.from('v_echipamente').select('*').eq('contract_id', id).order('data_punere_functiune'),
-      supabase.from('v_operatiuni_validare').select('id,data_operatiune,moneda,suma,cine,detalii,descriere_banca,decontat,legat_echipament,documente')
+      supabase.from('v_operatiuni_validare').select('id,data_operatiune,moneda,suma,cine,detalii,descriere_banca,decontat,legat_echipament,tva_neeligibila,documente')
         .eq('contract_id', id).eq('sens', 'debit').eq('aferenta_proiect', true).is('operatiune_parinte_id', null)
         .in('tip', ['plata_furnizor', 'retragere_numerar', 'altele']).order('suma', { ascending: false }).limit(1000),
       supabase.from('documente').select('id,numar,furnizor_denumire,descriere,moneda,suma_totala').eq('contract_id', id).order('data_document', { ascending: false }),
@@ -105,7 +106,8 @@ export default function Echipamente() {
             <thead><tr><th>Echipament</th><th className="n">Cost</th><th>Amortizare</th><th className="n">% proiect</th><th className="n">Perioada 1</th><th className="n">Perioada 2</th><th className="n">Eligibil acum</th><th className="n">Eligibil total</th><th /></tr></thead>
             <tbody>
               {lista.map(e => (
-                <tr key={e.id}>
+                <Fragment key={e.id}>
+                <tr>
                   <td className="lat">
                     <div className="tare">{e.denumire}</div>
                     <div className="mic gri">pus în funcțiune {data(e.data_punere_functiune)}{e.document_numar ? ` · factura ${e.document_numar}` : ''}</div>
@@ -117,8 +119,16 @@ export default function Echipamente() {
                   {[1, 2].map(p => { const x = e.pe_perioade.find(z => z.perioada === p); return <td key={p} className="n">{num(x?.eligibil)}<div className="mic gri">{x?.luni ?? 0} luni</div></td> })}
                   <td className="n tare">{num(e.eligibil_pana_acum)}<div className="mic gri">{e.luni_scurse} luni</div></td>
                   <td className="n">{num(e.eligibil_total)}<div className="mic gri">{e.luni_in_proiect} luni</div></td>
-                  <td><button className="link-mic rosu-text" disabled={lucreaza} onClick={() => sterge(e)}>șterge</button></td>
+                  <td className="nowrap"><button className="link-mic" onClick={() => setEditez(editez === e.id ? null : e.id)}>modifică</button>
+                    <button className="link-mic rosu-text" disabled={lucreaza} onClick={() => sterge(e)}>șterge</button></td>
                 </tr>
+                {editez === e.id && (
+                  <tr className="rand-detaliu"><td colSpan={9}>
+                    <Editare e={e} docs={docs} lucreaza={lucreaza} setLucreaza={setLucreaza} inchide={() => setEditez(null)}
+                      gata={async t => { setMesaj({ cls: 'verde', text: t }); setEditez(null); await incarca() }} />
+                  </td></tr>
+                )}
+                </Fragment>
               ))}
               {lista.length === 0 && <tr><td colSpan={9} className="gol-rand">Niciun echipament înregistrat. Adăugați-l pornind de la plata cu care a fost cumpărat.</td></tr>}
             </tbody>
@@ -134,7 +144,7 @@ function Formular({ contractId, ops, docs, initial, lucreaza, setLucreaza, inchi
   contractId: string; ops: Op[]; docs: Doc[]; initial: string | null; lucreaza: boolean; setLucreaza: (b: boolean) => void
   inchide: () => void; gata: (t: string) => Promise<void>
 }) {
-  const libere = useMemo(() => ops.map(o => ({ ...o, liber: Number(o.suma) - Number(o.decontat) - Number(o.legat_echipament) })).filter(o => o.liber > 0.004), [ops])
+  const libere = useMemo(() => ops.map(o => ({ ...o, liber: Number(o.suma) - Number(o.decontat) - Number(o.legat_echipament) - Number(o.tva_neeligibila) })).filter(o => o.liber > 0.004), [ops])
   const [opId, setOpId] = useState(initial && libere.some(o => o.id === initial) ? initial : '')
   const [filtru, setFiltru] = useState('')
   const op = libere.find(o => o.id === opId)
@@ -212,6 +222,7 @@ function Formular({ contractId, ops, docs, initial, lucreaza, setLucreaza, inchi
             </select></label>
             <label className="lat2">Observații<input value={v.observatii} onChange={e => set('observatii', e.target.value)} placeholder="ex. folosit și pentru alt proiect 20%" /></label>
           </div>
+          {Number(op.tva_neeligibila) > 0 && <p className="mic gri">Din plată, {num(op.tva_neeligibila)} sunt TVA deductibilă (firma o recuperează), deci costul de amortizat e fără TVA.</p>}
           {lunar > 0 && procent > 0 && (
             <p className="mic">Amortizare lunară {num(lunar)} · pe proiect {num(lunar * procent / 100)} pe lună, începând cu luna de după {data(v.data)}.</p>
           )}
@@ -223,5 +234,51 @@ function Formular({ contractId, ops, docs, initial, lucreaza, setLucreaza, inchi
         </>
       )}
     </section>
+  )
+}
+
+function Editare({ e, docs, lucreaza, setLucreaza, inchide, gata }: {
+  e: Ech; docs: Doc[]; lucreaza: boolean; setLucreaza: (b: boolean) => void; inchide: () => void; gata: (t: string) => Promise<void>
+}) {
+  const [v, setV] = useState({ denumire: e.denumire, cost: String(e.cost_achizitie).replace('.', ','), data: e.data_punere_functiune,
+    durata: String(e.durata_amortizare_luni), procent: String(Number(e.procent_utilizare)), document: e.document_id ?? '', observatii: e.observatii ?? '' })
+  const [eroare, setEroare] = useState<string | null>(null)
+  const set = (k: string, val: string) => setV(x => ({ ...x, [k]: val }))
+  const nr = (s: string) => Number(s.replace(/\s/g, '').replace(',', '.'))
+  const cost = nr(v.cost), durata = parseInt(v.durata), procent = nr(v.procent)
+  async function salveaza() {
+    setEroare(null)
+    if (!v.denumire.trim()) return setEroare('Scrieți ce echipament este.')
+    if (!(cost > 0)) return setEroare('Costul trebuie să fie mai mare decât 0.')
+    if (!(durata >= 1 && durata <= 600)) return setEroare('Durata de amortizare, în luni.')
+    if (!(procent > 0 && procent <= 100)) return setEroare('Procentul de folosire pe proiect: între 1 și 100.')
+    if (!v.data) return setEroare('Data punerii în funcțiune.')
+    setLucreaza(true)
+    const { error } = await supabase.rpc('modifica_echipament', { p_id: e.id, p_denumire: v.denumire, p_cost: cost, p_data: v.data,
+      p_durata: durata, p_procent: procent, p_document: v.document || null, p_observatii: v.observatii })
+    setLucreaza(false)
+    if (error) setEroare(error.message); else await gata(`„${v.denumire.trim()}” a fost modificat.`)
+  }
+  return (
+    <div className="detaliu-op">
+      <div className="campuri">
+        <label className="lat2">Ce echipament<input value={v.denumire} onChange={x => set('denumire', x.target.value)} /></label>
+        <label>Cost de achiziție ({e.moneda === 'RON' ? 'lei' : 'EUR'})<input inputMode="decimal" value={v.cost} onChange={x => set('cost', x.target.value)} /></label>
+        <label>Pus în funcțiune la<input type="date" value={v.data} onChange={x => set('data', x.target.value)} /></label>
+        <label>Durata de amortizare (luni)<input inputMode="numeric" value={v.durata} onChange={x => set('durata', x.target.value)} /></label>
+        <label>% folosire pe proiect<input inputMode="decimal" value={v.procent} onChange={x => set('procent', x.target.value)} /></label>
+        <label className="lat2">Factura<select value={v.document} onChange={x => set('document', x.target.value)}>
+          <option value="">— fără / încă neîncărcată —</option>
+          {docs.filter(d => d.moneda === e.moneda).map(d => <option key={d.id} value={d.id}>{d.numar ?? 'fără număr'} · {d.furnizor_denumire ?? ''} · {num(d.suma_totala)}</option>)}
+        </select></label>
+        <label className="lat2">Observații<input value={v.observatii} onChange={x => set('observatii', x.target.value)} /></label>
+      </div>
+      {cost > 0 && durata > 0 && procent > 0 && <p className="mic">Amortizare lunară {num(cost / durata)} · pe proiect {num(cost / durata * procent / 100)} pe lună.</p>}
+      {eroare && <div className="alerta rosu">{eroare}</div>}
+      <div className="rand-butoane">
+        <button className="buton mic-b" disabled={lucreaza} onClick={salveaza}>{lucreaza ? 'Se salvează…' : 'Salvează modificările'}</button>
+        <button className="buton-text" disabled={lucreaza} onClick={inchide}>Renunță</button>
+      </div>
+    </div>
   )
 }

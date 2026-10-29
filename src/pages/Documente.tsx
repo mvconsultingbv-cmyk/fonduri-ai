@@ -13,6 +13,7 @@ type Doc = {
   tva_deductibila: boolean; descriere: string | null; fisier_cale: string | null
 }
 type Stare = { document_id: string; platit_potrivit: number; rest: number; stare: string; restant: boolean }
+type StatutTva = { platitor: boolean; de_la: string }
 type Rec = { id: string; document_id: string; operatiune_id: string; suma: number }
 type Prop = { document_id: string; operatiune_id: string; potrivire_suma: string | null; numar_in_text: boolean; nume_in_text: boolean; scor: number; rest_op: number }
 type Op = { id: string; data_operatiune: string; moneda: string; suma: number; cine: string | null; detalii: string | null; descriere_banca: string | null; tip: string | null; documentat: number; aferenta_proiect: boolean | null; sens: string; operatiune_parinte_id: string | null }
@@ -39,6 +40,7 @@ export default function Documente() {
   const [cauta, setCauta] = useState('')
   const [deschis, setDeschis] = useState<string | null>(null)
   const [coada, setCoada] = useState<File[]>([])
+  const [tva, setTva] = useState<StatutTva[]>([])
 
   const incarca = useCallback(async () => {
     if (!id) return
@@ -60,6 +62,8 @@ export default function Documente() {
     }
     setDocs((d.data ?? []) as Doc[]); setStari((s.data ?? []) as Stare[]); setRecs((r.data ?? []) as Rec[])
     setProps((p.data ?? []) as Prop[]); setOps(toate)
+    const t = await supabase.from('v_statut_tva').select('platitor,de_la').eq('contract_id', id).order('de_la')
+    setTva((t.data ?? []) as StatutTva[])
   }, [id])
   useEffect(() => { incarca() }, [incarca])
 
@@ -133,7 +137,10 @@ export default function Documente() {
         <p>{docs.length} documente încărcate · {nr('platit')} plătite · {nr('partial')} parțial · {nr('neplatit')} fără plată potrivită · {faraDocument.length} plăți aferente fără document</p>
       </section>
 
-      <Incarcare contractId={id!} coada={coada} setCoada={setCoada} lucreaza={lucreaza} setLucreaza={setLucreaza}
+      <BaraTva contractId={id!} tva={tva} lucreaza={lucreaza} setLucreaza={setLucreaza}
+        gata={async (txt, cls) => { setMesaj({ cls, text: txt }); await incarca() }} />
+
+      <Incarcare contractId={id!} tva={tva} coada={coada} setCoada={setCoada} lucreaza={lucreaza} setLucreaza={setLucreaza}
         gata={async (txt, cls) => { setMesaj({ cls, text: txt }); await incarca() }} />
 
       <section className="file-vederi">
@@ -288,10 +295,10 @@ async function amprenta(f: File) {
   return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('')
 }
 const azi = () => new Date().toISOString().slice(0, 10)
-const gol = () => ({ tip: 'factura', numar: '', data_document: '', data_scadenta: '', furnizor_denumire: '', furnizor_cui: '', moneda: 'RON', suma_totala: '', suma_tva: '', tva_deductibila: false, descriere: '' })
+const gol = () => ({ tip: 'factura', numar: '', data_document: '', data_scadenta: '', furnizor_denumire: '', furnizor_cui: '', moneda: 'RON', suma_totala: '', suma_tva: '', tva_deductibila: false as boolean, descriere: '' })
 
-function Incarcare({ contractId, coada, setCoada, lucreaza, setLucreaza, gata }: {
-  contractId: string; coada: File[]; setCoada: (f: File[]) => void; lucreaza: boolean; setLucreaza: (b: boolean) => void
+function Incarcare({ contractId, tva, coada, setCoada, lucreaza, setLucreaza, gata }: {
+  contractId: string; tva: StatutTva[]; coada: File[]; setCoada: (f: File[]) => void; lucreaza: boolean; setLucreaza: (b: boolean) => void
   gata: (text: string, cls: string) => Promise<void>
 }) {
   const f = coada[0]
@@ -300,6 +307,10 @@ function Incarcare({ contractId, coada, setCoada, lucreaza, setLucreaza, gata }:
   const url = useMemo(() => (f ? URL.createObjectURL(f) : null), [f])
   useEffect(() => () => { if (url) URL.revokeObjectURL(url) }, [url])
   const set = (k: string, val: string | boolean) => setV(x => ({ ...x, [k]: val }))
+  // TVA deductibilă implicit = firma era plătitoare de TVA la data documentului; se poate schimba de mână.
+  const [tvaAtins, setTvaAtins] = useState(false)
+  const platitorLa = (d: string) => [...tva].filter(t => t.de_la <= d).pop()?.platitor ?? false
+  useEffect(() => { if (!tvaAtins && v.data_document) setV(x => ({ ...x, tva_deductibila: platitorLa(x.data_document) })) }, [v.data_document, tva]) // eslint-disable-line react-hooks/exhaustive-deps
   const nr = (s: string) => Number(s.replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'))
 
   async function salveaza() {
@@ -324,7 +335,7 @@ function Incarcare({ contractId, coada, setCoada, lucreaza, setLucreaza, gata }:
         descriere: v.descriere.trim() || null, fisier_cale: cale, fisier_amprenta: h,
       })
       if (ins.error) throw new Error(/duplicate|unique/i.test(ins.error.message) ? 'Acest fișier a mai fost încărcat (același conținut).' : ins.error.message)
-      setCoada(coada.slice(1)); setV(x => ({ ...gol(), moneda: x.moneda, tip: x.tip }))
+      setCoada(coada.slice(1)); setTvaAtins(false); setV(x => ({ ...gol(), moneda: x.moneda, tip: x.tip }))
       await gata(`Documentul ${v.numar || f.name} a fost salvat. Verificați mai jos plata propusă.`, 'verde')
     } catch (e) { setEroare((e as Error).message) }
     setLucreaza(false)
@@ -355,7 +366,7 @@ function Incarcare({ contractId, coada, setCoada, lucreaza, setLucreaza, gata }:
               <label>Monedă<select value={v.moneda} onChange={e => set('moneda', e.target.value)}><option value="RON">lei</option><option value="EUR">EUR</option></select></label>
               <label>Total de plată (cu TVA)<input inputMode="decimal" value={v.suma_totala} onChange={e => set('suma_totala', e.target.value)} placeholder="0,00" /></label>
               <label>din care TVA<input inputMode="decimal" value={v.suma_tva} onChange={e => set('suma_tva', e.target.value)} placeholder="0,00" /></label>
-              <label className="bifa-camp"><input type="checkbox" checked={v.tva_deductibila} onChange={e => set('tva_deductibila', e.target.checked)} /> TVA deductibilă (firma își recuperează TVA-ul)</label>
+              <label className="bifa-camp"><input type="checkbox" checked={v.tva_deductibila} onChange={e => { setTvaAtins(true); set('tva_deductibila', e.target.checked) }} /> TVA deductibilă (firma își recuperează TVA-ul)</label>
               <label className="lat2">Ce s-a cumpărat<input value={v.descriere} onChange={e => set('descriere', e.target.value)} placeholder="ex. laptop pentru echipa de proiect" /></label>
             </div>
             {eroare && <div className="alerta rosu">{eroare}</div>}
@@ -364,11 +375,52 @@ function Incarcare({ contractId, coada, setCoada, lucreaza, setLucreaza, gata }:
               <button className="buton-text" disabled={lucreaza} onClick={() => setCoada(coada.slice(1))}>Sari peste</button>
               <button className="buton-text" disabled={lucreaza} onClick={() => setCoada([])}>Renunță la toate</button>
             </div>
-            <p className="nota">TVA deductibilă nu e eligibilă în proiect; TVA nedeductibilă (firmă neplătitoare de TVA) este eligibilă.</p>
+            <p className="nota">Căsuța TVA se bifează singură după statutul firmei la data documentului; o puteți schimba pentru cazuri speciale. TVA deductibilă nu e eligibilă; TVA nedeductibilă este.</p>
           </div>
           <div className="previzualizare">
             {url && (f.type.startsWith('image/') ? <img src={url} alt={f.name} /> : <iframe src={url} title={f.name} />)}
           </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function BaraTva({ contractId, tva, lucreaza, setLucreaza, gata }: {
+  contractId: string; tva: StatutTva[]; lucreaza: boolean; setLucreaza: (b: boolean) => void; gata: (t: string, c: string) => Promise<void>
+}) {
+  const [deschis, setDeschis] = useState(false)
+  const [platitor, setPlatitor] = useState(true)
+  const [deLa, setDeLa] = useState('')
+  const azi = new Date().toISOString().slice(0, 10)
+  const curent = [...tva].filter(t => t.de_la <= azi).pop()
+  async function salveaza() {
+    if (!deLa) return
+    setLucreaza(true)
+    const { error } = await supabase.rpc('seteaza_statut_tva', { p_contract: contractId, p_platitor: platitor, p_de_la: deLa })
+    setLucreaza(false)
+    if (error) await gata(error.message, 'rosu')
+    else { setDeschis(false); await gata(`Statutul de TVA a fost salvat: ${platitor ? 'plătitoare' : 'neplătitoare'} de la ${data(deLa)}.`, 'verde') }
+  }
+  return (
+    <section className="bloc bara-tva">
+      <div>
+        <div className="tare">Statutul de TVA al firmei: {tva.length === 0 ? <span className="eticheta galben">nesetat – se consideră neplătitoare</span>
+          : <span className={`eticheta ${curent?.platitor ? 'albastru-e' : 'verde'}`}>{curent?.platitor ? 'plătitoare de TVA' : 'neplătitoare de TVA'}</span>}</div>
+        <div className="mic gri">
+          {tva.length > 0 && <>Istoric: {tva.map(t => `${t.platitor ? 'plătitoare' : 'neplătitoare'} de la ${data(t.de_la)}`).join(' → ')}. </>}
+          Plătitoare: TVA-ul din facturi e deductibil și nu intră pe proiect. Neplătitoare: TVA-ul e cost real și e eligibil.
+        </div>
+      </div>
+      {!deschis ? <button className="buton-text" onClick={() => setDeschis(true)}>{tva.length ? 'Schimbă' : 'Setează'}</button> : (
+        <div className="form-alocare">
+          <select value={platitor ? 'da' : 'nu'} onChange={e => setPlatitor(e.target.value === 'da')} aria-label="Statut TVA">
+            <option value="da">plătitoare de TVA</option><option value="nu">neplătitoare de TVA</option>
+          </select>
+          <span className="mic gri">de la</span>
+          <input type="date" value={deLa} onChange={e => setDeLa(e.target.value)} aria-label="De la data" />
+          <button className="buton mic-b" disabled={lucreaza || !deLa} onClick={salveaza}>Salvează</button>
+          <button className="buton-text" onClick={() => setDeschis(false)}>Renunță</button>
         </div>
       )}
     </section>

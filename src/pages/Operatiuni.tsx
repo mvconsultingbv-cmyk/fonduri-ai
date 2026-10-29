@@ -16,6 +16,7 @@ type Op = {
   nr_comisioane: number; suma_comisioane: number; cine: string | null; detalii: string | null; descriere_banca: string | null
   decontat: number; alocari: Alocare[]
   legat_echipament: number; echipamente: { id: string; echipament_id: string; denumire: string; suma: number }[]
+  tva_neeligibila: number; peste_eligibil: boolean
   documentat: number; documente: { id: string; document_id: string; numar: string | null; tip: string; suma: number }[]
 }
 type Pozitie = { id: string; capitol: string; denumire: string; mod_calcul: string }
@@ -64,7 +65,7 @@ export default function Operatiuni() {
     const toate: Op[] = []
     for (let de = 0; ; de += 1000) {
       const r = await supabase.from('v_operatiuni_validare')
-        .select('id,cont_id,iban,moneda,cont_denumire,extras_numar,rand_extras,data_operatiune,sens,suma,tip_propus,tip_confirmat,tip,aferenta_proiect,in_perioada_mixta,operatiune_parinte_id,nr_comisioane,suma_comisioane,cine,detalii,descriere_banca,decontat,alocari,legat_echipament,echipamente,documentat,documente')
+        .select('id,cont_id,iban,moneda,cont_denumire,extras_numar,rand_extras,data_operatiune,sens,suma,tip_propus,tip_confirmat,tip,aferenta_proiect,in_perioada_mixta,operatiune_parinte_id,nr_comisioane,suma_comisioane,cine,detalii,descriere_banca,decontat,alocari,legat_echipament,echipamente,documentat,documente,tva_neeligibila,peste_eligibil')
         .eq('contract_id', id).order('data_operatiune').order('rand_extras').range(de, de + 999)
       if (r.error) { setEroare('Operațiunile nu au putut fi citite.'); return }
       toate.push(...(r.data as unknown as Op[]))
@@ -90,7 +91,7 @@ export default function Operatiuni() {
   const deFacut = useMemo(() => ({
     mixt: principale.filter(o => o.in_perioada_mixta && o.aferenta_proiect === null),
     tip: principale.filter(o => !o.tip_confirmat),
-    alocare: principale.filter(o => o.sens === 'debit' && o.aferenta_proiect === true && DE_ALOCAT.has(o.tip ?? '') && Number(o.decontat) + Number(o.legat_echipament) < Number(o.suma) - 0.004),
+    alocare: principale.filter(o => o.sens === 'debit' && o.aferenta_proiect === true && DE_ALOCAT.has(o.tip ?? '') && Number(o.decontat) + Number(o.legat_echipament) + Number(o.tva_neeligibila) < Number(o.suma) - 0.004),
     toate: principale,
   }), [principale])
 
@@ -206,7 +207,7 @@ export default function Operatiuni() {
               {vizibile.map(o => {
                 const fees = comisioane.get(o.id) ?? []
                 const alocabil = o.sens === 'debit' && o.aferenta_proiect === true && !FARA_ALOCARE.has(o.tip ?? '')
-                const rest = Number(o.suma) - Number(o.decontat) - Number(o.legat_echipament)
+                const rest = Number(o.suma) - Number(o.decontat) - Number(o.legat_echipament) - Number(o.tva_neeligibila)
                 return (
                   <Fragment key={o.id}>
                     <tr className={selectate.has(o.id) ? 'rand-selectat' : ''}>
@@ -245,6 +246,8 @@ export default function Operatiuni() {
                       </td>
                       <td>
                         {o.alocari.map(a => <div key={a.id} className="mic"><span className="eticheta albastru-e">{a.capitol}</span> {num(a.suma)}</div>)}
+                        {Number(o.tva_neeligibila) > 0 && <div className="mic gri" title="TVA deductibilă din factură: firma o recuperează, nu intră pe proiect">TVA {num(o.tva_neeligibila)} neelig.</div>}
+                        {o.peste_eligibil && <div className="mic rosu-text" title="S-a alocat mai mult decât partea eligibilă (după TVA deductibilă). Stornați diferența.">⚠ peste eligibil</div>}
                         {o.echipamente.map(e => <div key={e.id} className="mic" title={`Echipament: ${e.denumire} – pe proiect intră doar amortizarea`}><span className="eticheta galben-e">C.2</span> {num(e.suma)}</div>)}
                         {alocabil && rest > 0.004 && <button className="link-mic" onClick={() => setDeschis(deschis === o.id ? null : o.id)}>{o.alocari.length ? `+ rest ${num(rest)}` : 'Alocă'}</button>}
                         {!alocabil && o.alocari.length === 0 && o.echipamente.length === 0 && (
@@ -309,6 +312,12 @@ function Detaliu({ contractId, o, fees, alocabil, rest, pozitii, lucreaza, aloca
       )}
       {o.echipamente.length > 0 && (
         <div className="mic">Achiziție de echipament (C.2): {o.echipamente.map(e => `${e.denumire} – ${num(e.suma)}`).join(', ')} · pe proiect intră amortizarea. <Link to={`/contract/${contractId}/echipamente`}>vezi echipamentele</Link></div>
+      )}
+      {Number(o.tva_neeligibila) > 0 && (
+        <div className="mic">Din plată, {bani(o.tva_neeligibila, o.moneda)} sunt TVA deductibilă (după factura potrivită) și nu se pot aloca pe proiect.</div>
+      )}
+      {o.peste_eligibil && (
+        <div className="alerta rosu">Alocările depășesc partea eligibilă a plății (suma minus TVA deductibilă). Stornați alocarea și refaceți-o cu suma corectă.</div>
       )}
       {o.documente.length > 0 && (
         <div className="mic">Documente: {o.documente.map(d => `${d.numar ?? d.tip} (${num(d.suma)})`).join(', ')} · <Link to={`/contract/${contractId}/documente`}>vezi documentele</Link></div>
