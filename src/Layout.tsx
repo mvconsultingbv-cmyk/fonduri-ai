@@ -11,6 +11,7 @@ export default function Layout() {
           <span className="marca-nume">Fonduri europene</span>
         </Link>
         <div className="bara-dreapta">
+          {utilizator?.este_admin_platforma && <Link to="/admin" className="buton-text">Administrare</Link>}
           <span className="cine">
             {utilizator?.nume || sesiune?.user.email}
             {utilizator?.este_admin_platforma && <span className="eticheta">administrator</span>}
