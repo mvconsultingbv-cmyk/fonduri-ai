@@ -16,7 +16,7 @@ type Op = {
   nr_comisioane: number; suma_comisioane: number; cine: string | null; detalii: string | null; descriere_banca: string | null
   decontat: number; alocari: Alocare[]
   legat_echipament: number; echipamente: { id: string; echipament_id: string; denumire: string; suma: number }[]
-  tva_neeligibila: number; peste_eligibil: boolean
+  tva_neeligibila: number; peste_eligibil: boolean; indirecta: number
   documentat: number; documente: { id: string; document_id: string; numar: string | null; tip: string; suma: number }[]
 }
 type Pozitie = { id: string; capitol: string; denumire: string; mod_calcul: string }
@@ -38,7 +38,7 @@ type Vedere = 'mixt' | 'tip' | 'alocare' | 'toate'
 const VEDERI: { cheie: Vedere; titlu: string; explicatie: string }[] = [
   { cheie: 'mixt', titlu: 'Cont mixt: aferent / neaferent', explicatie: 'Operațiunile din conturile vechi, din perioada în care contul a fost folosit și pentru alte activități ale asociației. Pentru fiecare decideți dacă ține de proiect. Comisionul legat de o plată urmează automat decizia plății.' },
   { cheie: 'tip', titlu: 'Tip de confirmat', explicatie: 'Aplicația a citit textul băncii și a propus un tip. Confirmați-l sau schimbați-l. Tipul decide unde poate merge operațiunea mai departe (pe buget, la schimburi, la transferuri).' },
-  { cheie: 'alocare', titlu: 'De alocat pe capitole', explicatie: 'Plăți aferente proiectului, încă nealocate (sau alocate parțial) pe capitolele de buget care se decontează din plăți. Salariile și contribuțiile nu apar aici: se decontează pe capitolul A prin pontaje (modul în lucru). Comisioanele bancare sunt acoperite, de regulă, de costurile indirecte (E). Dacă o plată marcată „taxe” e de fapt un serviciu, schimbați-i tipul și va apărea aici.' },
+  { cheie: 'alocare', titlu: 'De alocat pe capitole', explicatie: 'Plăți aferente proiectului, încă nealocate (sau alocate parțial) pe capitolele de buget care se decontează din plăți. Salariile și contribuțiile nu apar aici: se decontează pe capitolul A prin pontaje (modul în lucru). Comisioanele bancare și plățile marcate „indirecte (E)” sunt acoperite de procentul capitolului E. Dacă o plată marcată „taxe” e de fapt un serviciu, schimbați-i tipul și va apărea aici.' },
   { cheie: 'toate', titlu: 'Toate operațiunile', explicatie: 'Toate operațiunile din extrasele încărcate, cu filtrele de mai sus.' },
 ]
 
@@ -65,7 +65,7 @@ export default function Operatiuni() {
     const toate: Op[] = []
     for (let de = 0; ; de += 1000) {
       const r = await supabase.from('v_operatiuni_validare')
-        .select('id,cont_id,iban,moneda,cont_denumire,extras_numar,rand_extras,data_operatiune,sens,suma,tip_propus,tip_confirmat,tip,aferenta_proiect,in_perioada_mixta,operatiune_parinte_id,nr_comisioane,suma_comisioane,cine,detalii,descriere_banca,decontat,alocari,legat_echipament,echipamente,documentat,documente,tva_neeligibila,peste_eligibil')
+        .select('id,cont_id,iban,moneda,cont_denumire,extras_numar,rand_extras,data_operatiune,sens,suma,tip_propus,tip_confirmat,tip,aferenta_proiect,in_perioada_mixta,operatiune_parinte_id,nr_comisioane,suma_comisioane,cine,detalii,descriere_banca,decontat,alocari,legat_echipament,echipamente,documentat,documente,tva_neeligibila,peste_eligibil,indirecta')
         .eq('contract_id', id).order('data_operatiune').order('rand_extras').range(de, de + 999)
       if (r.error) { setEroare('Operațiunile nu au putut fi citite.'); return }
       toate.push(...(r.data as unknown as Op[]))
@@ -91,7 +91,7 @@ export default function Operatiuni() {
   const deFacut = useMemo(() => ({
     mixt: principale.filter(o => o.in_perioada_mixta && o.aferenta_proiect === null),
     tip: principale.filter(o => !o.tip_confirmat),
-    alocare: principale.filter(o => o.sens === 'debit' && o.aferenta_proiect === true && DE_ALOCAT.has(o.tip ?? '') && Number(o.decontat) + Number(o.legat_echipament) + Number(o.tva_neeligibila) < Number(o.suma) - 0.004),
+    alocare: principale.filter(o => o.sens === 'debit' && o.aferenta_proiect === true && DE_ALOCAT.has(o.tip ?? '') && Number(o.decontat) + Number(o.legat_echipament) + Number(o.tva_neeligibila) + Number(o.indirecta) < Number(o.suma) - 0.004),
     toate: principale,
   }), [principale])
 
@@ -185,6 +185,7 @@ export default function Operatiuni() {
             <button className="buton mic-b verde-b" disabled={lucreaza} onClick={() => clasifica(sel, { aferenta: true }, `${sel.length} operațiuni marcate aferente proiectului.`)}>Aferente proiectului</button>
             <button className="buton mic-b rosu-b" disabled={lucreaza} onClick={() => clasifica(sel, { aferenta: false }, `${sel.length} operațiuni marcate neaferente.`)}>Neaferente</button>
           </>}
+          {vedere === 'alocare' && <button className="buton mic-b" disabled={lucreaza} onClick={() => actiune(() => supabase.rpc('marcheaza_indirecte', { p_ids: sel, p_marcat: true }), `${sel.length} plăți marcate cheltuieli indirecte (E).`).then(() => setSelectate(new Set()))}>Indirecte (E)</button>}
           <button className="buton mic-b" disabled={lucreaza} onClick={() => clasifica(sel, { confirma: true }, 'Tipul propus a fost confirmat.')}>Confirmă tipul propus</button>
           <select className="mic-b" disabled={lucreaza} value="" onChange={e => e.target.value && clasifica(sel, { tip: e.target.value }, `Tipul a fost schimbat în „${TIP[e.target.value]}”.`)}>
             <option value="">Schimbă tipul în…</option>
@@ -207,7 +208,7 @@ export default function Operatiuni() {
               {vizibile.map(o => {
                 const fees = comisioane.get(o.id) ?? []
                 const alocabil = o.sens === 'debit' && o.aferenta_proiect === true && !FARA_ALOCARE.has(o.tip ?? '')
-                const rest = Number(o.suma) - Number(o.decontat) - Number(o.legat_echipament) - Number(o.tva_neeligibila)
+                const rest = Number(o.suma) - Number(o.decontat) - Number(o.legat_echipament) - Number(o.tva_neeligibila) - Number(o.indirecta)
                 return (
                   <Fragment key={o.id}>
                     <tr className={selectate.has(o.id) ? 'rand-selectat' : ''}>
@@ -246,11 +247,12 @@ export default function Operatiuni() {
                       </td>
                       <td>
                         {o.alocari.map(a => <div key={a.id} className="mic"><span className="eticheta albastru-e">{a.capitol}</span> {num(a.suma)}</div>)}
+                        {Number(o.indirecta) > 0 && <div className="mic" title="Cheltuială indirectă: plătită din banii proiectului, acoperită de procentul capitolului E"><span className="eticheta">E</span> {num(o.indirecta)}</div>}
                         {Number(o.tva_neeligibila) > 0 && <div className="mic gri" title="TVA deductibilă din factură: firma o recuperează, nu intră pe proiect">TVA {num(o.tva_neeligibila)} neelig.</div>}
                         {o.peste_eligibil && <div className="mic rosu-text" title="S-a alocat mai mult decât partea eligibilă (după TVA deductibilă). Stornați diferența.">⚠ peste eligibil</div>}
                         {o.echipamente.map(e => <div key={e.id} className="mic" title={`Echipament: ${e.denumire} – pe proiect intră doar amortizarea`}><span className="eticheta galben-e">C.2</span> {num(e.suma)}</div>)}
                         {alocabil && rest > 0.004 && <button className="link-mic" onClick={() => setDeschis(deschis === o.id ? null : o.id)}>{o.alocari.length ? `+ rest ${num(rest)}` : 'Alocă'}</button>}
-                        {!alocabil && o.alocari.length === 0 && o.echipamente.length === 0 && (
+                        {!alocabil && o.alocari.length === 0 && o.echipamente.length === 0 && Number(o.indirecta) === 0 && (
                           o.sens === 'debit' && o.aferenta_proiect === true && PE_PONTAJ.has(o.tip ?? '') ? <span className="mic gri">A · prin pontaj</span>
                           : o.sens === 'debit' && o.aferenta_proiect === true && o.tip === 'comision_bancar' ? <span className="mic gri">E · indirecte</span>
                           : <span className="mic gri">—</span>)}
@@ -260,7 +262,8 @@ export default function Operatiuni() {
                       <tr className="rand-detaliu">
                         <td />
                         <td colSpan={6}>
-                          <Detaliu key={`${o.id}-${rest}`} contractId={id!} o={o} fees={fees} alocabil={alocabil} rest={rest} pozitii={pozAlocabile} lucreaza={lucreaza}
+                          <Detaliu key={`${o.id}-${rest}`} contractId={id!} o={o}
+                            indirect={(m) => actiune(() => supabase.rpc('marcheaza_indirecte', { p_ids: [o.id], p_marcat: m }), m ? 'Plata a fost marcată cheltuială indirectă (E).' : 'Marcajul de cheltuială indirectă a fost anulat.')} fees={fees} alocabil={alocabil} rest={rest} pozitii={pozAlocabile} lucreaza={lucreaza}
                             aloca={(poz, suma) => actiune(() => supabase.rpc('aloca_pe_buget', { p_operatiune: o.id, p_pozitie: poz, p_suma: suma }), 'Alocarea a fost salvată.')}
                             storneaza={(aid) => { if (window.confirm('Stornați această alocare? Rămâne în istoric, dar nu mai contează în buget.')) actiune(() => supabase.rpc('storneaza_alocare', { p_decontare: aid, p_motiv: 'corectat din ecranul de validare' }), 'Alocarea a fost stornată.') }}
                           />
@@ -285,8 +288,8 @@ export default function Operatiuni() {
   )
 }
 
-function Detaliu({ contractId, o, fees, alocabil, rest, pozitii, lucreaza, aloca, storneaza }: {
-  contractId: string; o: Op; fees: Op[]; alocabil: boolean; rest: number; pozitii: Pozitie[]; lucreaza: boolean
+function Detaliu({ contractId, indirect, o, fees, alocabil, rest, pozitii, lucreaza, aloca, storneaza }: {
+  contractId: string; indirect: (marcat: boolean) => void; o: Op; fees: Op[]; alocabil: boolean; rest: number; pozitii: Pozitie[]; lucreaza: boolean
   aloca: (poz: string, suma: number) => void; storneaza: (id: string) => void
 }) {
   const [poz, setPoz] = useState(pozitii[0]?.id ?? '')
@@ -321,6 +324,12 @@ function Detaliu({ contractId, o, fees, alocabil, rest, pozitii, lucreaza, aloca
       )}
       {o.documente.length > 0 && (
         <div className="mic">Documente: {o.documente.map(d => `${d.numar ?? d.tip} (${num(d.suma)})`).join(', ')} · <Link to={`/contract/${contractId}/documente`}>vezi documentele</Link></div>
+      )}
+      {Number(o.indirecta) > 0 && (
+        <div className="mic">Cheltuială indirectă (E): {bani(o.indirecta, o.moneda)} — plătită din banii proiectului, acoperită de procentul capitolului E, nu se decontează direct. <button className="link-mic rosu-text" disabled={lucreaza} onClick={() => indirect(false)}>anulează</button></div>
+      )}
+      {alocabil && rest > 0.004 && Number(o.indirecta) === 0 && (
+        <div className="mic"><button className="link-mic" disabled={lucreaza} onClick={() => indirect(true)}>E o cheltuială indirectă (overhead)? Marchează pe E →</button></div>
       )}
       {alocabil && rest > 0.004 && (
         <div className="mic"><Link className="link-mic" to={`/contract/${contractId}/echipamente?operatiune=${o.id}`}>E un echipament? Înregistrează-l pe C.2 (amortizare) →</Link></div>
