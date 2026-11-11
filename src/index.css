@@ -268,3 +268,14 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--linie); border-bottom: 
 .cap-cont { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 18px 4px; flex-wrap: wrap; }
 .rand-lipsa td { background: var(--galben-f); color: #5c3d00; }
 .cap-cont > div { min-width: 0; } .cap-cont .mono { white-space: normal; overflow-wrap: anywhere; }
+
+/* Numerar și avansuri */
+.eticheta.gri-e { background: #eef1f5; color: #6b7684; }
+.detaliu-avans { padding: 6px 4px 10px; }
+.spatiu-mic { margin-bottom: 10px; }
+.subtitlu { font-size: 0.95rem; margin: 18px 0 8px; }
+.lista-justificari { list-style: none; padding: 0; margin: 0 0 12px; }
+.lista-justificari li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid #eef1f5; font-size: 0.88rem; }
+.form-justificare { margin-top: 8px; }
+.file-vederi.mici { margin-bottom: 10px; }
+.file-vederi.mici .fila { font-size: 0.8rem; padding: 5px 12px; }

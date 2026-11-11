@@ -33,10 +33,8 @@ export const ECRANE_CONTRACT: Ecran[] = [
     rost: 'Bani mutați între conturile proiectului sau către / dinspre contul propriu al asociației.',
     vaFace: ['Perechea ieșire–intrare pentru fiecare transfer între conturile proiectului.', 'Motivul fiecărei mișcări cu contul propriu (alimentare, recuperare overhead, recuperare comisioane, returnare).', 'Soldul „datorat” între proiect și asociație.'],
     pregatit: ['Tabelul de transferuri interne și motivele pentru contul propriu.', 'Tipul se poate deja schimba din ecranul de validare.'] },
-  { cheie: 'numerar', titlu: 'Numerar și avansuri', grup: 'Bani', stadiu: 'in_lucru',
-    rost: 'Retragerile de numerar trebuie justificate cu documente sau redepuse.',
-    vaFace: ['Lista retragerilor, cine are banii și până când trebuie justificați.', 'Legarea bonurilor/chitanțelor sau a depunerii înapoi în cont.', 'Semnal pentru sumele nejustificate la termen.'],
-    pregatit: ['Tabelele de avansuri și justificări, cu calculul restului nejustificat.'] },
+  { cheie: 'numerar', titlu: 'Numerar și avansuri', grup: 'Bani', stadiu: 'gata',
+    rost: 'Fiecare retragere de numerar e un avans: cine are banii, până când, și justificarea cu bonuri/facturi sau redepunere în cont.' },
 
   { cheie: 'documente', titlu: 'Facturi și documente', grup: 'Cheltuieli', stadiu: 'gata',
     rost: 'Încărcarea facturilor, potrivirea cu plățile, statutul de TVA.' },
