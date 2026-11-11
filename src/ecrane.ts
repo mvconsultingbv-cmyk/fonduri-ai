@@ -40,10 +40,8 @@ export const ECRANE_CONTRACT: Ecran[] = [
 
   { cheie: 'documente', titlu: 'Facturi și documente', grup: 'Cheltuieli', stadiu: 'gata',
     rost: 'Încărcarea facturilor, potrivirea cu plățile, statutul de TVA.' },
-  { cheie: 'personal', titlu: 'Personal și pontaje (A)', grup: 'Cheltuieli', stadiu: 'in_lucru',
-    rost: 'Costurile de personal: zile lucrate pe proiect × cost zilnic (Horizon: cost anual ÷ 215 zile).',
-    vaFace: ['Fișa fiecărei persoane (contract de muncă sau drepturi de autor, normă).', 'Pontajul lunar: ore / zile pe proiect.', 'Costul zilnic din statul de plată (salariu + contribuții).', 'Leagă plățile de salarii și contribuții (deja marcate „A · prin pontaj”) de luna și persoana lor.'],
-    pregatit: ['Plățile de salarii și taxe sunt deja recunoscute și blocate de la alocarea pe C.1/C.3.'] },
+  { cheie: 'personal', titlu: 'Personal și pontaje (A)', grup: 'Cheltuieli', stadiu: 'gata',
+    rost: 'Persoanele, salariul lunar și zilele pe proiect: eligibil = zile × (cost lunar ÷ 17,92), legat de plățile de salarii și taxe din extrase.' },
   { cheie: 'echipamente', titlu: 'Echipamente (C.2)', grup: 'Cheltuieli', stadiu: 'gata',
     rost: 'Achiziții legate de plată; pe proiect intră doar amortizarea.' },
   { cheie: 'contrapartide', titlu: 'Furnizori și beneficiari', grup: 'Cheltuieli', stadiu: 'in_lucru',
