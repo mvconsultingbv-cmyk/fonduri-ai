@@ -42,10 +42,8 @@ export const ECRANE_CONTRACT: Ecran[] = [
     rost: 'Persoanele, salariul lunar și zilele pe proiect: eligibil = zile × (cost lunar ÷ 17,92), legat de plățile de salarii și taxe din extrase.' },
   { cheie: 'echipamente', titlu: 'Echipamente (C.2)', grup: 'Cheltuieli', stadiu: 'gata',
     rost: 'Achiziții legate de plată; pe proiect intră doar amortizarea.' },
-  { cheie: 'contrapartide', titlu: 'Furnizori și beneficiari', grup: 'Cheltuieli', stadiu: 'in_lucru',
-    rost: 'Registrul celor cărora asociația le plătește sau de la care încasează (PF / PJ).',
-    vaFace: ['Fișa fiecărui furnizor / beneficiar: tip (persoană fizică / juridică), CUI, IBAN-uri.', 'Totalul plătit fiecăruia din proiect.', 'Recunoașterea automată a plătitorului / beneficiarului din textul băncii.'],
-    pregatit: ['Tabelul de contrapartide (PF, PJ, instituție publică, cont propriu), cu CUI străin.'] },
+  { cheie: 'contrapartide', titlu: 'Furnizori și beneficiari', grup: 'Cheltuieli', stadiu: 'gata',
+    rost: 'Registrul celor plătiți și al celor de la care se încasează, propus din extrase: tip, CUI, părți legate, dubluri de unit și semnale de audit.' },
 
   { cheie: 'transe', titlu: 'Tranșe de finanțare', grup: 'Buget și raportare', stadiu: 'partial',
     rost: 'Ce trebuie să primească asociația de la finanțator și ce a primit.',

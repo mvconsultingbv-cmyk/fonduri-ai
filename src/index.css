@@ -279,3 +279,8 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--linie); border-bottom: 
 .form-justificare { margin-top: 8px; }
 .file-vederi.mici { margin-bottom: 10px; }
 .file-vederi.mici .fila { font-size: 0.8rem; padding: 5px 12px; }
+
+/* Furnizori și beneficiari */
+td.semnale { min-width: 120px; max-width: 190px; }
+td.semnale .eticheta { display: inline-block; margin: 0 4px 3px 0; white-space: normal; }
+td.semnale .eticheta + .eticheta { margin-left: 0; }
