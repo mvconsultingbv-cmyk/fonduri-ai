@@ -8,6 +8,7 @@ import Operatiuni from './pages/Operatiuni'
 import Documente from './pages/Documente'
 import Echipamente from './pages/Echipamente'
 import Extrase from './pages/Extrase'
+import Schimburi from './pages/Schimburi'
 import ContractLayout from './ContractLayout'
 import EcranInLucru from './pages/EcranInLucru'
 import Admin from './pages/Admin'
@@ -36,6 +37,7 @@ function Poarta() {
           <Route path="documente" element={<Documente />} />
           <Route path="echipamente" element={<Echipamente />} />
           <Route path="extrase" element={<Extrase />} />
+          <Route path="schimburi" element={<Schimburi />} />
           <Route path=":ecran" element={<EcranInLucru />} />
         </Route>
         <Route path="admin" element={<Admin />} />
