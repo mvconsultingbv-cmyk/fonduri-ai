@@ -5,7 +5,7 @@ import { bani, curs, data, num, procent } from '../lib/format'
 
 // Raportare pe perioade: situația financiară pe capitole, în EUR, la cursul de referință al perioadei.
 // Calculul e făcut în baza de date (v_raport_perioade), pe aceleași reguli ca tabloul de bord:
-//  - A Personal: eligibilul lunilor de salariu din perioadă (rată zilnică Horizon × zile), deja în EUR;
+//  - A Personal: eligibilul lunilor de salariu din perioadă (după regula programului), deja în EUR;
 //  - C.1 / C.3: plățile alocate capitolului în perioadă; leii ÷ cursul perioadei; stornările anulează originalul;
 //  - C.2 Echipamente: doar amortizarea lunilor scurse din perioadă, nu prețul de cumpărare;
 //  - E Indirecte: procentul din contract (25%) aplicat la suma costurilor directe ale perioadei.
@@ -110,8 +110,8 @@ export default function Raportare() {
         <b>{bani(t.neconf, 'EUR')}</b> din această perioadă sunt doar <b>propuse</b> de aplicație (de exemplu lunile de salariu încă neconfirmate în ecranul <Link to={`/contract/${id}/personal`}>Personal</Link>), împreună cu partea lor de costuri indirecte. Cifrele devin definitive după confirmare.
       </div>}
       {p.provizoriu && <div className="alerta galben spatiu">Perioada e încă în curs: cursul de referință e media zilelor scurse până azi și se schimbă până la {data(p.data_sfarsit)}. Toate sumele convertite din lei se recalculează singure.</div>}
-      {p.perioada === 1 && p.stare !== 'raportata' && <div className="alerta albastru spatiu">
-        <b>Raportul pe perioada 1 a fost deja depus la Comisie.</b> Când primești documentul depus, îl încărcăm și aici, iar ecranul va arăta diferențele pe fiecare capitol față de cifrele de mai jos. Abia după aceea perioada se închide în aplicație; după închidere, nimic din ea nu se mai poate modifica.
+      {!p.provizoriu && p.stare !== 'raportata' && <div className="alerta albastru spatiu">
+        <b>Perioada s-a încheiat, dar nu e încă închisă în aplicație.</b> Dacă raportul ei a fost deja depus la finanțator, documentul depus se va putea încărca aici, iar ecranul va arăta diferențele pe fiecare capitol față de cifrele de mai jos. Abia după aceea perioada se închide; după închidere, nimic din ea nu se mai poate modifica.
       </div>}
 
       <section className="bloc fara-padding">

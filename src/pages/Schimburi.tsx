@@ -95,7 +95,7 @@ export default function Schimburi() {
         {' '}Din ea, aproximativ {bani(tot.costBanca, 'RON')} reprezintă marja băncii față de cursul BCE; restul vine din diferența dintre cursul BCE din ziua schimbului și media pe toată perioada.
       </div>
 
-      {areProvizoriu && <div className="alerta galben spatiu">Cursul perioadei 2 este <b>provizoriu</b>: e media zilelor scurse până acum și se schimbă până la sfârșitul perioadei (31.05.2027). Diferența de curs pentru perioada 2 se va recalcula singură.</div>}
+      {areProvizoriu && <div className="alerta galben spatiu">Cursul perioadei în curs este <b>provizoriu</b>: e media zilelor scurse până acum și se schimbă până la sfârșitul perioadei. Diferența de curs pentru această perioadă se va recalcula singură.</div>}
       {neaferente > 0 && <div className="alerta galben spatiu">{neaferente} {neaferente === 1 ? 'schimb e marcat' : 'schimburi sunt marcate'} ca neaferente proiectului (contul mixt) și nu intră în totaluri.</div>}
 
       <section className="bloc fara-padding">

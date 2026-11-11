@@ -146,7 +146,7 @@ export default function TabloDeBord() {
       <section className="cifre">
         <Cifra eticheta="Buget aprobat" valoare={bani(calc.buget || k.valoare_finantare_eur, moneda)} />
         <Cifra eticheta="Primit de la finanțator" valoare={bani(calc.incasat, moneda)} sub={calc.buget ? `${procent((100 * calc.incasat) / calc.buget)} din buget` : undefined} />
-        <Cifra eticheta="Cheltuit (decontat)" valoare={bani(calc.chEchiv, moneda)} sub={calc.chLei ? `din care ${bani(calc.chLei, 'RON')} convertiți estimativ` : 'echivalent la cursul HEAT'} />
+        <Cifra eticheta="Cheltuit (decontat)" valoare={bani(calc.chEchiv, moneda)} sub={calc.chLei ? `din care ${bani(calc.chLei, 'RON')} convertiți estimativ` : 'echivalent la cursul de referință'} />
         <Cifra eticheta="Bani în conturi acum" valoare={bani(calc.disponibilEchiv, moneda)} sub="echivalent la cursul perioadei curente" accent />
       </section>
 
