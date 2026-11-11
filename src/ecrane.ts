@@ -23,10 +23,8 @@ export const ECRANE_CONTRACT: Ecran[] = [
   { cheie: '', titlu: 'Tablou de bord', grup: 'Privire de ansamblu', stadiu: 'gata',
     rost: 'Bugetul, banii primiți, cheltuiți și disponibili, conturile, cursul și tranșele.' },
 
-  { cheie: 'extrase', titlu: 'Extrase de cont', grup: 'Bani', stadiu: 'in_lucru',
-    rost: 'Încărcarea extraselor bancare (PDF) și verificarea lanțului de solduri.',
-    vaFace: ['Încarci PDF-ul extrasului; aplicația citește operațiunile și le propune tipul.', 'Verifică automat că soldul final al unui extras e soldul inițial al următorului.', 'Învață formatul fiecărei bănci (biblioteca de bănci).', 'Semnalează extrasele lipsă (de ex. contul vechi în EUR, ian–feb 2025).'],
-    pregatit: ['Tabelele de extrase și operațiuni, cu regula de lanț (sold final = sold inițial următor).', 'Stocare privată pentru fișiere.', 'Cele 33 de extrase ATRAE sunt deja încărcate (prin Claude).'] },
+  { cheie: 'extrase', titlu: 'Extrase de cont', grup: 'Bani', stadiu: 'gata',
+    rost: 'Lanțul de solduri pe fiecare cont și încărcarea extraselor noi (PDF BCR), cu verificare înainte de salvare.' },
   { cheie: 'operatiuni', titlu: 'Validarea operațiunilor', grup: 'Bani', stadiu: 'gata',
     rost: 'Aferent / neaferent, confirmarea tipului, alocarea pe capitole, cheltuieli indirecte.' },
   { cheie: 'schimburi', titlu: 'Schimburi valutare', grup: 'Bani', stadiu: 'in_lucru',

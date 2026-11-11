@@ -257,3 +257,14 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--linie); border-bottom: 
 .meniu-inapoi { color: var(--gri); font-size: 0.82rem; }
 .cu-meniu > * { min-width: 0; }
 @media (max-width: 560px) { .bara-dreapta { gap: 6px; } .bara-dreapta .buton-text { padding: 6px 8px; font-size: 0.85rem; } .marca-nume { font-size: 0.95rem; } }
+
+/* Extrase de cont */
+.coada-extrase { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.card-extras { border: 1px solid var(--linie); border-left: 4px solid var(--navy-2); border-radius: 10px; padding: 12px 14px; background: #fff; }
+.card-extras.eroare { border-left-color: var(--rosu); background: #fffafa; }
+.card-extras.salvat { border-left-color: var(--verde); background: #fafdfb; }
+.card-extras-sus { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.verificari { list-style: none; margin: 10px 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 0.86rem; }
+.cap-cont { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 18px 4px; flex-wrap: wrap; }
+.rand-lipsa td { background: var(--galben-f); color: #5c3d00; }
+.cap-cont > div { min-width: 0; } .cap-cont .mono { white-space: normal; overflow-wrap: anywhere; }
