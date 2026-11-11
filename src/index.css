@@ -284,3 +284,6 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--linie); border-bottom: 
 td.semnale { min-width: 120px; max-width: 190px; }
 td.semnale .eticheta { display: inline-block; margin: 0 4px 3px 0; white-space: normal; }
 td.semnale .eticheta + .eticheta { margin-left: 0; }
+
+/* Raportare pe perioade: rândul de total */
+.rand-total td { border-top: 2px solid var(--linie, #d8d8d8); background: rgba(0, 0, 0, 0.025); }
