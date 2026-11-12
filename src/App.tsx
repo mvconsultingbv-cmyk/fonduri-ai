@@ -19,6 +19,7 @@ import Contrapartide from './pages/Contrapartide'
 import ContractLayout from './ContractLayout'
 import EcranInLucru from './pages/EcranInLucru'
 import Admin from './pages/Admin'
+import Jurnal from './pages/Jurnal'
 
 function Poarta() {
   const { incarcare, sesiune, utilizator, iesire } = useAuth()
@@ -52,9 +53,11 @@ function Poarta() {
           <Route path="transe" element={<Transe />} />
           <Route path="transferuri" element={<Transferuri />} />
           <Route path="buget" element={<Buget />} />
+          <Route path="jurnal" element={<Jurnal />} />
           <Route path=":ecran" element={<EcranInLucru />} />
         </Route>
         <Route path="admin" element={<Admin />} />
+        <Route path="admin/jurnal" element={<Jurnal general />} />
         <Route path="admin/:ecran" element={<EcranInLucru admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

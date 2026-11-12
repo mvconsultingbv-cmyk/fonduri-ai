@@ -51,13 +51,13 @@ export const ECRANE_CONTRACT: Ecran[] = [
     rost: 'Situația cheltuielilor pe perioada de raportare, în EUR, la cursul perioadei.',
     vaFace: ['Comparația cu raportul depus la finanțator, pe capitole.', 'Închiderea perioadei: după raportare, nimic din ea nu se mai modifică.'],
     pregatit: ['Raportul pe capitole pentru fiecare perioadă, cu E calculat automat și export CSV.', 'Blocarea datelor după închiderea perioadei.'] },
-  { cheie: 'jurnal', titlu: 'Jurnal', grup: 'Buget și raportare', stadiu: 'in_lucru',
-    rost: 'Cine a schimbat ce și când — pentru audit.',
-    vaFace: ['Lista tuturor modificărilor, filtrabilă după persoană, dată și tip.'],
-    pregatit: ['Fiecare modificare e deja înregistrată automat în jurnal (nu se poate șterge).'] },
+  { cheie: 'jurnal', titlu: 'Jurnal', grup: 'Buget și raportare', stadiu: 'gata',
+    rost: 'Cine a schimbat ce și când, cu valoarea veche și cea nouă — pentru audit. Scris automat de baza de date, nu se poate modifica sau șterge.' },
 ]
 
 export const ECRANE_ADMIN: Ecran[] = [
+  { cheie: 'jurnal', titlu: 'Jurnal general', grup: 'Administrare', stadiu: 'gata',
+    rost: 'Cine a schimbat ce și când în bibliotecile comune (programe, bănci) și în administrare (utilizatori, firme).' },
   { cheie: 'programe', titlu: 'Biblioteca de programe', grup: 'Administrare', stadiu: 'in_lucru',
     rost: 'Regulile fiecărui program de finanțare (Horizon Europe, PNRR, POR etc.), aprobate de M.V. Consulting.',
     vaFace: ['Regulile programului cu articolul din ghid (curs, eligibilitate, TVA, amortizare).', 'Aprobarea unei reguli noi propuse de aplicație la citirea unui contract.', 'Excepțiile specifice unui contract.'],
