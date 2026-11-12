@@ -45,10 +45,8 @@ export const ECRANE_CONTRACT: Ecran[] = [
   { cheie: 'contrapartide', titlu: 'Furnizori și beneficiari', grup: 'Cheltuieli', stadiu: 'gata',
     rost: 'Registrul celor plătiți și al celor de la care se încasează, propus din extrase: tip, CUI, părți legate, dubluri de unit și semnale de audit.' },
 
-  { cheie: 'transe', titlu: 'Tranșe de finanțare', grup: 'Buget și raportare', stadiu: 'partial',
-    rost: 'Ce trebuie să primească asociația de la finanțator și ce a primit.',
-    vaFace: ['Adăugarea tranșelor din contract (prefinanțare, plăți intermediare, plata finală).', 'Legarea fiecărei încasări din extras de tranșa ei.', 'Reîmpărțirea automată a banilor primiți pe capitole la fiecare tranșă.'],
-    pregatit: ['Tabelul de tranșe și repartizarea proporțională pe capitole (se vede pe tabloul de bord).'] },
+  { cheie: 'transe', titlu: 'Tranșe de finanțare', grup: 'Buget și raportare', stadiu: 'gata',
+    rost: 'Tranșele din contract, legarea fiecărei încasări din extras de tranșa ei și împărțirea banilor primiți pe capitole.' },
   { cheie: 'buget', titlu: 'Modificări de buget', grup: 'Buget și raportare', stadiu: 'in_lucru',
     rost: 'Mutări de bani între capitole, prin act adițional sau notificare.',
     vaFace: ['Înregistrarea unei modificări cu documentul ei.', 'Bugetul în vigoare la orice dată.'],
