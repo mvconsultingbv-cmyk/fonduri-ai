@@ -23,7 +23,7 @@ const SURSA: Record<string, (r: Rand) => string> = {
   pontaj: r => `${r.nr_elemente} ${r.nr_elemente === 1 ? 'lună' : 'luni'} de salariu${r.nr_neconfirmate ? `, ${r.nr_neconfirmate} neconfirmate` : ''}`,
   plati: r => `${r.nr_elemente} plăți${Number(r.cheltuit_lei) ? ` · ${bani(r.cheltuit_lei, 'RON')} convertiți` : ''}${Number(r.cheltuit_eur) ? ` · ${bani(r.cheltuit_eur, 'EUR')} direct` : ''}`,
   amortizare: r => `amortizare, ${r.nr_elemente} echipamente${Number(r.cheltuit_lei) ? ` · ${bani(r.cheltuit_lei, 'RON')}` : ''}`,
-  procent: r => `${num(r.procent)}% din costurile directe`,
+  procent: r => `${num(r.procent)}% din costurile directe din bază`,
 }
 
 const csvNum = (v: number | null | undefined) => (v == null ? '' : Number(v).toFixed(2).replace('.', ','))
@@ -33,9 +33,12 @@ export default function Raportare() {
   const [randuri, setRanduri] = useState<Rand[] | null>(null)
   const [eroare, setEroare] = useState<string | null>(null)
   const [aleasa, setVedere] = useState<number | null>(null)
+  const [pragCfs, setPragCfs] = useState<number | null>(null)
 
   useEffect(() => {
     if (!id) return
+    // Pragul pentru certificatul de audit (CFS) vine din biblioteca de programe; programele fără această regulă nu arată nimic.
+    supabase.rpc('valoare_regula', { p_contract: id, p_cod: 'prag_certificat_cfs_eur' }).then(({ data: v }) => setPragCfs(v == null ? null : Number(v)))
     supabase.from('v_raport_perioade').select('*').eq('contract_id', id).order('perioada').order('ordine').then(({ data: d, error }) => {
       if (error) setEroare('Datele nu au putut fi citite.')
       else setRanduri((d ?? []) as Rand[])
@@ -106,6 +109,9 @@ export default function Raportare() {
         <div className="cifra"><div className="cifra-eticheta">Stare perioadă</div><div className="cifra-valoare mic-v">{p.stare === 'raportata' ? 'raportată' : inCurs ? 'în curs' : 'deschisă'}</div><div className="cifra-sub">{p.raportata_la ? `închisă la ${data(p.raportata_la.slice(0, 10))}` : 'datele se mai pot corecta'}</div></div>
       </section>
 
+      {pragCfs != null && (t.buget >= pragCfs
+        ? <div className="alerta galben spatiu"><b>Certificat de audit (CFS) necesar la final.</b> Bugetul ({bani(t.buget, 'EUR')}) trece de pragul programului de {bani(pragCfs, 'EUR')}. Dacă suma cerută pe costuri reale ajunge la prag (acum, cumulat, {bani(t.cumulat, 'EUR')}), raportul final trebuie însoțit de certificatul unui auditor independent. Planificați auditorul din timp.</div>
+        : <p className="mic gri spatiu">Certificat de audit (CFS): nu e necesar, bugetul ({bani(t.buget, 'EUR')}) e sub pragul programului de {bani(pragCfs, 'EUR')}.</p>)}
       {t.neconf > 0 && <div className="alerta galben spatiu">
         <b>{bani(t.neconf, 'EUR')}</b> din această perioadă sunt doar <b>propuse</b> de aplicație (de exemplu lunile de salariu încă neconfirmate în ecranul <Link to={`/contract/${id}/personal`}>Personal</Link>), împreună cu partea lor de costuri indirecte. Cifrele devin definitive după confirmare.
       </div>}

@@ -31,6 +31,8 @@ const lunaText = (d: string) => { const [y, m] = d.split('-'); return `${m}.${y}
 const nr = (s: string) => Number(String(s).replace(/\s/g, '').replace(',', '.'))
 const txt = (v: number | null | undefined) => (v == null ? '' : String(Number(v)).replace('.', ','))
 
+type ZileAn = { persoana_id: string; nume: string; an: number; zile_declarate: number; zile_taiate: number; limita: number | null; zile_toate_contractele: number; nr_contracte: number; depaseste: boolean }
+
 export default function Personal() {
   const { id } = useParams()
   const [pers, setPers] = useState<Persoana[] | null>(null)
@@ -40,6 +42,7 @@ export default function Personal() {
   const [leg, setLeg] = useState<Leg[]>([])
   const [bugetA, setBugetA] = useState<number | null>(null)
   const [zileAn, setZileAn] = useState<number | null>(null)
+  const [zilePeAn, setZilePeAn] = useState<ZileAn[]>([])
   const [eroare, setEroare] = useState<string | null>(null)
   const [mesaj, setMesaj] = useState<{ cls: string; text: string } | null>(null)
   const [lucreaza, setLucreaza] = useState(false)
@@ -49,7 +52,7 @@ export default function Personal() {
 
   const incarca = useCallback(async () => {
     if (!id) return
-    const [p, l, t, o, g, b, z] = await Promise.all([
+    const [p, l, t, o, g, b, z, za] = await Promise.all([
       supabase.from('persoane_proiect').select('id,nume,functie,tip_contract,norma_ore_zi,exclusiv_pe_proiect,data_inceput,data_sfarsit,cuvinte_banca,observatii').eq('contract_id', id).order('data_inceput'),
       supabase.from('v_personal_luni').select('*').eq('contract_id', id).order('luna'),
       supabase.from('v_personal_taxe').select('luna,datorate,platite,nr_plati,diferenta').eq('contract_id', id).order('luna'),
@@ -59,11 +62,13 @@ export default function Personal() {
       supabase.from('personal_plati').select('operatiune_id,tip,luna,persoana_id').eq('contract_id', id),
       supabase.from('v_buget_in_vigoare').select('suma_in_vigoare_eur').eq('contract_id', id).eq('mod_calcul', 'pontaj'),
       supabase.rpc('valoare_regula', { p_contract: id, p_cod: 'zile_productive_an' }),
+      supabase.from('v_personal_zile_an').select('persoana_id,nume,an,zile_declarate,zile_taiate,limita,zile_toate_contractele,nr_contracte,depaseste').eq('contract_id', id).order('an'),
     ])
     if (p.error || l.error || t.error || o.error || g.error) { setEroare('Datele nu au putut fi citite.'); return }
     setPers(p.data as Persoana[]); setLuni(l.data as Luna[]); setTaxe(t.data as Taxa[]); setOps(o.data as Op[]); setLeg(g.data as Leg[])
     setBugetA((b.data ?? []).reduce((a, x) => a + Number(x.suma_in_vigoare_eur), 0))
     setZileAn(z.data == null ? null : Number(z.data))
+    setZilePeAn((za.data ?? []) as ZileAn[])
   }, [id])
   useEffect(() => { incarca() }, [incarca])
 
@@ -120,6 +125,21 @@ export default function Personal() {
       {tot.deduse > 0 && <div className="alerta albastru spatiu">
         <b>Salariile brute sunt deduse din plăți</b>, nu luate din statele de plată: din netul plătit am calculat brutul (CAS 25%, CASS 10%, impozit 10%, CAM 2,25%), iar taxele rezultate se potrivesc cu ce s-a plătit la buget (tabelul de jos). Confirmați fiecare lună după statul de plată al contabilului.
       </div>}
+      {zilePeAn.filter(z => z.depaseste).map(z => (
+        <div key={`${z.persoana_id}-${z.an}`} className="alerta rosu spatiu">
+          <b>{z.nume}, anul {z.an}: {num(z.zile_toate_contractele)} zile declarate, peste limita de {num(z.limita)} zile pe an.</b>{' '}
+          {Number(z.nr_contracte) > 1 ? `Zilele se adună pe toate cele ${z.nr_contracte} contracte ale firmei pe care lucrează persoana (pe acesta ${num(z.zile_declarate)}). ` : ''}
+          Regula programului nu permite declararea mai multor zile pe an decât cele folosite la calculul ratei zilnice. Reduceți zilele declarate, altfel diferența va fi tăiată la verificare.
+        </div>
+      ))}
+      {zilePeAn.filter(z => Number(z.zile_taiate) > 0).map(z => (
+        <div key={`t-${z.persoana_id}-${z.an}`} className="alerta galben spatiu">
+          <b>{z.nume}, anul {z.an}:</b> în pontaje sunt cu {num(z.zile_taiate)} zile mai multe decât cele disponibile în lunile respective. Aplicația a declarat doar zilele disponibile; verificați pontajele.
+        </div>
+      ))}
+      {zileAn != null && zilePeAn.length > 0 && !zilePeAn.some(z => z.depaseste) && <p className="mic gri spatiu">
+        Zile declarate pe an (limita programului: {num(zileAn)}): {zilePeAn.map(z => `${z.nume.split(' ')[0]} ${z.an}: ${num(z.zile_toate_contractele)}`).join(' · ')}.
+      </p>}
       {mesaj && <div className={`alerta ${mesaj.cls} spatiu`}>{mesaj.text}</div>}
 
       {formPers === 'nou'

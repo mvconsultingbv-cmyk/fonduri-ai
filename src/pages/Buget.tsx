@@ -12,7 +12,7 @@ import { bani, data, num, MOD_CALCUL } from '../lib/format'
 // Capitolele procentuale (ex. indirecte 25%) nu se modifică direct: urmează automat capitolele de bază.
 // Toate verificările stau în baza de date (probleme_modificare_buget); ecranul doar le afișează.
 
-type Poz = { pozitie_id: string; cod: string; denumire: string; mod_calcul: string; suma_initiala_eur: number; modificari_aprobate_eur: number; suma_in_vigoare_eur: number; procent: number | null; ordine: number | null }
+type Poz = { pozitie_id: string; cod: string; denumire: string; mod_calcul: string; suma_initiala_eur: number; modificari_aprobate_eur: number; suma_in_vigoare_eur: number; procent: number | null; in_baza?: boolean; ordine: number | null }
 type Linie = { id: string; pozitie_id: string; cod: string; denumire: string; diferenta: number }
 type Mod = {
   id: string; numar: string; tip: 'mutare' | 'act_aditional'; tip_document: string; data_document: string; data_efect: string; descriere: string | null
@@ -54,15 +54,17 @@ export default function Buget() {
 
   const incarca = useCallback(async () => {
     if (!id) return
-    const [p, m, d, c, a] = await Promise.all([
+    const [p, m, d, c, a, f] = await Promise.all([
       supabase.from('v_buget_in_vigoare').select('pozitie_id,cod,denumire,mod_calcul,suma_initiala_eur,modificari_aprobate_eur,suma_in_vigoare_eur,procent,ordine').eq('contract_id', id).order('ordine'),
       supabase.from('v_modificari_buget').select('*').eq('contract_id', id).order('data_efect', { ascending: false }).order('creat_la', { ascending: false }),
       supabase.from('documente').select('id,tip,numar,data_document,descriere').eq('contract_id', id).in('tip', ['act_aditional', 'notificare', 'altul']).order('data_document', { ascending: false }),
       supabase.from('contracte').select('valoare_finantare_eur,programe(moneda)').eq('id', id).single(),
       supabase.rpc('pot_aproba_buget', { p_contract: id }),
+      supabase.from('pozitii_buget').select('id,intra_baza_procent').eq('contract_id', id),
     ])
     if (p.error || m.error || d.error || c.error) { setEroare('Datele nu au putut fi citite.'); return }
-    setPoz(p.data as Poz[]); setMods(m.data as Mod[]); setDocs(d.data as Doc[])
+    const inBaza = new Map(((f.data ?? []) as { id: string; intra_baza_procent: boolean }[]).map(x => [x.id, x.intra_baza_procent]))
+    setPoz((p.data as Poz[]).map(x => ({ ...x, in_baza: inBaza.get(x.pozitie_id) ?? true }))); setMods(m.data as Mod[]); setDocs(d.data as Doc[])
     const ct = c.data as unknown as { valoare_finantare_eur: number; programe: { moneda: string } | null }
     setValoare(Number(ct.valoare_finantare_eur)); setMoneda(ct.programe?.moneda?.trim() || 'EUR')
     setPotAproba(Boolean(a.data))
@@ -118,7 +120,8 @@ export default function Buget() {
   const propuse = mods.filter(m => m.stare === 'propusa')
   const aprobate = mods.filter(m => m.stare === 'aprobata')
   const pct = poz.filter(p => p.mod_calcul === 'procent').reduce((a, p) => a + Number(p.procent ?? 0), 0)
-  const bazaPropusa = [...dupaPropuneri.entries()].reduce((a, [pid, d]) => a + (poz.find(p => p.pozitie_id === pid)?.mod_calcul === 'procent' ? 0 : d), 0)
+  const bazaPropusa = [...dupaPropuneri.entries()].reduce((a, [pid, d]) => { const q = poz.find(p => p.pozitie_id === pid); return a + (q?.mod_calcul === 'procent' || q?.in_baza === false ? 0 : d) }, 0)
+  const totalPropus = [...dupaPropuneri.entries()].reduce((a, [pid, d]) => a + (poz.find(p => p.pozitie_id === pid)?.mod_calcul === 'procent' ? 0 : d), 0)
 
   return (
     <>
@@ -170,7 +173,7 @@ export default function Buget() {
               <tr className="rand-total"><td><b>Total</b></td><td></td><td className="n tare">{num(totalInitial)}</td>
                 <td className="n tare">{semn(totalVigoare - totalInitial)}</td><td className="n tare">{num(totalVigoare)}</td>
                 {laData && <td className="n tare">{bugetLaData ? num(bugetLaData.reduce((a, b) => a + Number(b.suma_in_vigoare_eur), 0)) : '…'}</td>}
-                {propuse.length > 0 && <td className="n tare">{num(totalVigoare + bazaPropusa * (1 + pct / 100))}</td>}</tr>
+                {propuse.length > 0 && <td className="n tare">{num(totalVigoare + totalPropus + bazaPropusa * pct / 100)}</td>}</tr>
             </tbody>
           </table>
         </div>
@@ -250,7 +253,8 @@ function FormModificare({ contractId, m, poz, docs, pct, moneda, lucreaza, setLu
 
   const valori = baza.map(p => ({ p, d: dif[p.pozitie_id]?.trim() ? nr(dif[p.pozitie_id]) : 0 }))
   const suma = valori.reduce((a, x) => a + (Number.isFinite(x.d) ? x.d : 0), 0)
-  const efectProcent = Math.round(suma * pct) / 100
+  const sumaBaza = valori.reduce((a, x) => a + (Number.isFinite(x.d) && x.p.in_baza !== false ? x.d : 0), 0)
+  const efectProcent = Math.round(sumaBaza * pct) / 100
 
   function schimbaTip(t: string) {
     setV(x => ({ ...x, tip: t as Mod['tip'], tip_document: t === 'act_aditional' ? 'Act adițional' : (x.tip_document === 'Act adițional' ? 'Notă internă' : x.tip_document) }))
@@ -312,7 +316,7 @@ function FormModificare({ contractId, m, poz, docs, pct, moneda, lucreaza, setLu
           <tbody>
             {valori.map(({ p, d }) => (
               <tr key={p.pozitie_id}>
-                <td><b>{p.cod}</b> {p.denumire}</td>
+                <td><b>{p.cod}</b> {p.denumire}{p.in_baza === false && <span className="mic gri"> (nu intră în baza indirectelor)</span>}</td>
                 <td className="n">{num(p.suma_in_vigoare_eur)}</td>
                 <td className="n"><input inputMode="decimal" style={{ width: 130, textAlign: 'right' }} value={dif[p.pozitie_id] ?? ''} onChange={e => setDif(x => ({ ...x, [p.pozitie_id]: e.target.value }))} placeholder="0" /></td>
                 <td className={`n ${Number(p.suma_in_vigoare_eur) + (d || 0) < 0 ? 'rosu-text' : ''}`}>{num(Number(p.suma_in_vigoare_eur) + (Number.isFinite(d) ? d : 0))}</td>
@@ -320,10 +324,10 @@ function FormModificare({ contractId, m, poz, docs, pct, moneda, lucreaza, setLu
             ))}
             {poz.filter(p => p.mod_calcul === 'procent').map(p => (
               <tr key={p.pozitie_id} className="rand-detaliu">
-                <td><b>{p.cod}</b> {p.denumire} <span className="mic gri">(automat, {num(p.procent)}% din capitolele de bază)</span></td>
+                <td><b>{p.cod}</b> {p.denumire} <span className="mic gri">(automat, {num(p.procent)}% din capitolele din baza indirectelor)</span></td>
                 <td className="n">{num(p.suma_in_vigoare_eur)}</td>
-                <td className="n gri">{efectProcent ? semn(Math.round(suma * Number(p.procent ?? 0)) / 100) : '—'}</td>
-                <td className="n">{num(Number(p.suma_in_vigoare_eur) + Math.round(suma * Number(p.procent ?? 0)) / 100)}</td>
+                <td className="n gri">{efectProcent ? semn(Math.round(sumaBaza * Number(p.procent ?? 0)) / 100) : '—'}</td>
+                <td className="n">{num(Number(p.suma_in_vigoare_eur) + Math.round(sumaBaza * Number(p.procent ?? 0)) / 100)}</td>
               </tr>
             ))}
             <tr className="rand-total"><td><b>Suma diferențelor</b></td><td></td><td className={`n tare ${v.tip === 'mutare' && Math.abs(suma) > 0.004 ? 'rosu-text' : ''}`}>{semn(Math.round(suma * 100) / 100)}</td><td></td></tr>

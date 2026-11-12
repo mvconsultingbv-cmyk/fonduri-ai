@@ -16,7 +16,7 @@ type Program = {
   sursa_curs_referinta: string; regula_curs_tip: string | null; regula_curs: string | null
   metoda_alocare_lei: string; stare: Stare; aprobat_la: string | null
 }
-type Capitol = { id: string; program_id: string; capitol: string; cod: string; denumire: string; descriere_eligibilitate: string | null; mod_calcul: string; procent: number | null; optional: boolean; ordine: number }
+type Capitol = { id: string; program_id: string; capitol: string; cod: string; denumire: string; descriere_eligibilitate: string | null; mod_calcul: string; procent: number | null; optional: boolean; ordine: number; intra_baza_procent: boolean }
 type Regula = {
   id: string; program_id: string; cod: string; titlu: string; text_regula: string; articol_sursa: string; document_sursa: string | null
   versiune: number; inlocuieste_id: string | null; valabil_de_la: string | null; stare: Stare; aprobat_la: string | null; valoare: number | null; unitate: string | null
@@ -137,7 +137,7 @@ export default function Programe() {
           <section className="bloc fara-padding">
             <div className="bloc-titlu" style={{ padding: '18px 18px 0' }}>
               <h2>Capitolele standard ale bugetului</h2>
-              <p>Un contract nou pe acest program pornește cu aceste capitole; sumele le completează cel care introduce contractul. Capitolele „opționale” pot rămâne goale.</p>
+              <p>Un contract nou pe acest program pornește cu aceste capitole; sumele le completează cel care introduce contractul. Capitolele „opționale” pot rămâne goale. Capitolele procentuale (de exemplu indirectele) se calculează doar din capitolele care „intră în baza indirectelor”.</p>
             </div>
             <div className="tabel-wrap">
               <table className="tabel-op">
@@ -148,7 +148,8 @@ export default function Programe() {
                     : <tr key={c.id}>
                         <td className="mono"><b>{c.cod}</b></td>
                         <td>{c.denumire}{c.optional && <span className="eticheta gri-e">opțional</span>}</td>
-                        <td className="nowrap">{MOD_CALCUL[c.mod_calcul]}{c.procent != null && ` (${txt(c.procent)}%)`}</td>
+                        <td className="nowrap">{MOD_CALCUL[c.mod_calcul]}{c.procent != null && ` (${txt(c.procent)}%)`}
+                          {c.mod_calcul !== 'procent' && <div className="mic gri">{c.intra_baza_procent ? 'intră în baza indirectelor' : <b>nu intră în baza indirectelor</b>}</div>}</td>
                         <td className="mic">{c.descriere_eligibilitate}</td>
                         <td className="n nowrap">
                           <button className="buton-text" onClick={() => setForm(`cap:${c.id}`)}>Modifică</button>
@@ -204,7 +205,7 @@ export default function Programe() {
           </section>
         </>
       )}
-      <p className="nota">Regulile pe care le folosesc calculele, după cod: <span className="mono">zile_productive_an</span> (personal), <span className="mono">mutari_fara_act_permise</span> și <span className="mono">mutari_fara_act_procent_max</span> (modificări de buget). Celelalte reguli sunt informative, pentru cine verifică cheltuielile. Tot ce se schimbă aici apare în Jurnalul general.</p>
+      <p className="nota">Regulile pe care le folosesc calculele, după cod: <span className="mono">zile_productive_an</span> (personal), <span className="mono">mutari_fara_act_permise</span> și <span className="mono">mutari_fara_act_procent_max</span> (modificări de buget), <span className="mono">plafon_plati_procent</span> și <span className="mono">mecanism_asigurare_procent</span> (tranșe), <span className="mono">prag_certificat_cfs_eur</span> (raportare). Celelalte reguli sunt informative, pentru cine verifică cheltuielile. Tot ce se schimbă aici apare în Jurnalul general.</p>
     </>
   )
 }
@@ -261,7 +262,7 @@ type VCapitol = Omit<Capitol, 'id' | 'program_id'>
 function FormCapitol({ c, ordine, inchide, salveaza }: { c?: Capitol; ordine?: number; inchide: () => void; salveaza: (v: VCapitol) => Promise<void> }) {
   const [v, setV] = useState({
     capitol: c?.capitol ?? '', cod: c?.cod ?? '', denumire: c?.denumire ?? '', descriere_eligibilitate: c?.descriere_eligibilitate ?? '',
-    mod_calcul: c?.mod_calcul ?? 'plati', procent: txt(c?.procent), optional: c?.optional ?? false, ordine: String(c?.ordine ?? ordine ?? 1),
+    mod_calcul: c?.mod_calcul ?? 'plati', procent: txt(c?.procent), optional: c?.optional ?? false, ordine: String(c?.ordine ?? ordine ?? 1), intra_baza_procent: c?.intra_baza_procent ?? true,
   })
   const [eroare, setEroare] = useState<string | null>(null)
   const set = (k: string, x: string | boolean) => setV(o => ({ ...o, [k]: x }))
@@ -271,7 +272,7 @@ function FormCapitol({ c, ordine, inchide, salveaza }: { c?: Capitol; ordine?: n
     const pr = nr(v.procent)
     if (v.mod_calcul === 'procent' && (pr == null || !(pr > 0 && pr <= 100))) return setEroare('Un capitol procentual are nevoie de procent (între 0 și 100).')
     await salveaza({ capitol: v.capitol.trim() || v.cod.trim(), cod: v.cod.trim(), denumire: v.denumire.trim(), descriere_eligibilitate: v.descriere_eligibilitate.trim() || null,
-      mod_calcul: v.mod_calcul, procent: v.mod_calcul === 'procent' ? pr : null, optional: v.optional, ordine: Number(v.ordine) || 0 })
+      mod_calcul: v.mod_calcul, procent: v.mod_calcul === 'procent' ? pr : null, optional: v.optional, ordine: Number(v.ordine) || 0, intra_baza_procent: v.mod_calcul === 'procent' ? true : v.intra_baza_procent })
   }
   return (
     <div className="formular-doc">
@@ -283,10 +284,11 @@ function FormCapitol({ c, ordine, inchide, salveaza }: { c?: Capitol; ordine?: n
             {Object.entries(MOD_CALCUL).map(([k, t]) => <option key={k} value={k}>{t}</option>)}
           </select></label>
         {v.mod_calcul === 'procent'
-          ? <label>Procent din celelalte capitole<input value={v.procent} onChange={e => set('procent', e.target.value)} placeholder="ex. 25" /></label>
+          ? <label>Procent din capitolele din bază<input value={v.procent} onChange={e => set('procent', e.target.value)} placeholder="ex. 25" /></label>
           : <label>Ordine în listă<input value={v.ordine} onChange={e => set('ordine', e.target.value)} /></label>}
         <label className="lat2">Ce e eligibil (cu articolul din ghid)<textarea rows={2} value={v.descriere_eligibilitate} onChange={e => set('descriere_eligibilitate', e.target.value)} /></label>
         <label className="bifa-camp"><input type="checkbox" checked={v.optional} onChange={e => set('optional', e.target.checked)} /> Opțional (nu toate contractele îl au)</label>
+        {v.mod_calcul !== 'procent' && <label className="bifa-camp"><input type="checkbox" checked={v.intra_baza_procent} onChange={e => set('intra_baza_procent', e.target.checked)} /> Intră în baza indirectelor (a capitolelor procentuale)</label>}
       </div>
       {eroare && <div className="alerta rosu">{eroare}</div>}
       <div className="rand-butoane"><button className="buton" onClick={trimite}>{c ? 'Salvează' : 'Adaugă capitolul'}</button><button className="buton-text" onClick={inchide}>Renunță</button></div>

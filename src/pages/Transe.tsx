@@ -30,18 +30,22 @@ export default function Transe() {
   const [mesaj, setMesaj] = useState<{ cls: string; text: string } | null>(null)
   const [form, setForm] = useState<string | 'nou' | null>(null)
   const [lucreaza, setLucreaza] = useState(false)
+  const [reguli, setReguli] = useState<{ plafon: number | null; mim: number | null }>({ plafon: null, mim: null })
 
   const incarca = useCallback(async () => {
     if (!id) return
-    const [t, o, r, c] = await Promise.all([
+    const [t, o, r, c, pl, mi] = await Promise.all([
       supabase.from('transe').select('id,numar,tip,suma_asteptata_eur,termen,conditie,operatiune_id').eq('contract_id', id).order('numar'),
       supabase.from('v_operatiuni_validare').select('id,data_operatiune,suma,moneda,tip,contrapartida,descriere_banca,extras_numar')
         .eq('contract_id', id).eq('sens', 'credit').is('operatiune_parinte_id', null).order('data_operatiune'),
       supabase.from('v_repartizare_incasari').select('capitol,buget_capitol,pondere_procent,total_incasat,incasat_repartizat').eq('contract_id', id).order('buget_capitol', { ascending: false }),
       supabase.from('contracte').select('valoare_finantare_eur,programe(denumire,moneda)').eq('id', id).single(),
+      supabase.rpc('valoare_regula', { p_contract: id, p_cod: 'plafon_plati_procent' }),
+      supabase.rpc('valoare_regula', { p_contract: id, p_cod: 'mecanism_asigurare_procent' }),
     ])
     if (t.error || o.error || r.error || c.error) { setEroare('Datele nu au putut fi citite.'); return }
     setTranse(t.data as Transa[]); setOps(o.data as Op[]); setRep(r.data as Rep[]); setContract(c.data as unknown as Contract)
+    setReguli({ plafon: pl.data == null ? null : Number(pl.data), mim: mi.data == null ? null : Number(mi.data) })
   }, [id])
   useEffect(() => { incarca() }, [incarca])
 
@@ -81,6 +85,10 @@ export default function Transe() {
   const valoare = Number(contract.valoare_finantare_eur)
   const totalIncasat = Number(rep[0]?.total_incasat ?? sumar.incasat)
   const necuprins = valoare - sumar.asteptat
+  // Regulile programului (biblioteca de programe): plafonul plăților înainte de plata finală și mecanismul de asigurare.
+  const plafon = reguli.plafon != null ? Math.round(valoare * reguli.plafon) / 100 : null
+  const inainteDeFinala = transe.filter(t => t.tip !== 'finala').reduce((a, t) => a + Number(t.suma_asteptata_eur), 0)
+  const mim = reguli.mim != null ? Math.round(valoare * reguli.mim) / 100 : null
 
   return (
     <>
@@ -99,6 +107,13 @@ export default function Transe() {
       </section>
 
       {mesaj && <div className={`alerta ${mesaj.cls} spatiu`}>{mesaj.text}</div>}
+      {plafon != null && inainteDeFinala > plafon + 0.005 && <div className="alerta rosu spatiu">
+        Tranșele de dinaintea plății finale însumează <b>{bani(inainteDeFinala, moneda)}</b>, peste plafonul programului de {num(reguli.plafon)}% din finanțare (<b>{bani(plafon, moneda)}</b>). Diferența se poate primi doar la plata finală.
+      </div>}
+      {(plafon != null || mim != null) && <p className="mic gri spatiu">
+        Regulile programului:{plafon != null && <> înainte de plata finală se pot primi cel mult {num(reguli.plafon)}% din finanțare ({bani(plafon, moneda)}; introduse până acum {bani(inainteDeFinala, moneda)}).</>}
+        {mim != null && <> Din prefinanțare se rețin {num(reguli.mim)}% din finanțare ({bani(mim, moneda)}) pentru mecanismul de asigurare reciprocă; suma se primește de regulă înapoi la plata finală, deci la prefinanțare intră în cont mai puțin decât scrie în contract.</>}
+      </p>}
       {Math.abs(necuprins) > 0.005 && <div className="alerta galben spatiu">
         Tranșele introduse însumează <b>{bani(sumar.asteptat, moneda)}</b>, iar finanțarea e de <b>{bani(valoare, moneda)}</b>.
         {necuprins > 0 ? ` Mai trebuie introduse tranșe de ${bani(necuprins, moneda)} (de regulă plățile intermediare și plata finală, după rapoartele pe perioade).` : ` Tranșele depășesc finanțarea cu ${bani(-necuprins, moneda)}: verifică sumele.`}

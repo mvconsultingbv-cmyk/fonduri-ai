@@ -16,7 +16,7 @@ type Org = { id: string; denumire: string; cui: string | null }
 type Prog = { id: string; denumire: string; moneda: string; stare: string }
 type Banca = { id: string; denumire: string }
 type Contract = { id: string; organizatie_id: string; program_id: string; numar_contract: string; cod_proiect: string | null; titlu: string; valoare_finantare_eur: number; data_semnare: string | null; data_inceput: string; data_sfarsit: string; stare: string; trimis_la: string | null }
-type Poz = { id?: string; capitol: string; cod: string; denumire: string; descriere_eligibilitate: string | null; mod_calcul: string; procent: number | null; ordine: number; suma: string; optional?: boolean }
+type Poz = { id?: string; capitol: string; cod: string; denumire: string; descriere_eligibilitate: string | null; mod_calcul: string; procent: number | null; ordine: number; suma: string; optional?: boolean; intra_baza_procent: boolean }
 type Per = { id: string; numar: number; data_inceput: string; data_sfarsit: string }
 type Cont = { id: string; iban: string; moneda: string; denumire: string | null; data_deschidere: string; sold_deschidere: number; banci: { denumire: string } | null }
 type Transa = { id: string; numar: number; tip: string; suma_asteptata_eur: number; termen: string | null; conditie: string | null }
@@ -48,7 +48,7 @@ export default function ContractNou() {
   const [lucreaza, setLucreaza] = useState(false)
 
   const incarcaSablon = useCallback(async (programId: string) => {
-    const { data: cap } = await supabase.from('capitole_program').select('capitol,cod,denumire,descriere_eligibilitate,mod_calcul,procent,ordine,optional').eq('program_id', programId).order('ordine')
+    const { data: cap } = await supabase.from('capitole_program').select('capitol,cod,denumire,descriere_eligibilitate,mod_calcul,procent,ordine,optional,intra_baza_procent').eq('program_id', programId).order('ordine')
     return (cap ?? []).map(x => ({ ...x, suma: '' })) as Poz[]
   }, [])
 
@@ -62,7 +62,7 @@ export default function ContractNou() {
     if (id) {
       const [k, z, r, n, t, v] = await Promise.all([
         supabase.from('contracte').select('id,organizatie_id,program_id,numar_contract,cod_proiect,titlu,valoare_finantare_eur,data_semnare,data_inceput,data_sfarsit,stare,trimis_la').eq('id', id).maybeSingle(),
-        supabase.from('pozitii_buget').select('id,capitol,cod,denumire,descriere_eligibilitate,mod_calcul,procent,ordine,suma_initiala_eur').eq('contract_id', id).order('ordine'),
+        supabase.from('pozitii_buget').select('id,capitol,cod,denumire,descriere_eligibilitate,mod_calcul,procent,ordine,suma_initiala_eur,intra_baza_procent').eq('contract_id', id).order('ordine'),
         supabase.from('perioade_raportare').select('id,numar,data_inceput,data_sfarsit').eq('contract_id', id).order('numar'),
         supabase.from('conturi').select('id,iban,moneda,denumire,data_deschidere,sold_deschidere,banci(denumire)').eq('contract_id', id).order('creat_la'),
         supabase.from('transe').select('id,numar,tip,suma_asteptata_eur,termen,conditie').eq('contract_id', id).order('numar'),
@@ -136,7 +136,7 @@ export default function ContractNou() {
               const randuri = poz.filter(x => !(x.optional && !x.id && nr(x.suma) === 0))
               setMesaj(null); setLucreaza(true)
               for (const x of randuri) {
-                const r = { capitol: x.capitol, cod: x.cod, denumire: x.denumire, descriere_eligibilitate: x.descriere_eligibilitate, mod_calcul: x.mod_calcul, procent: x.procent, ordine: x.ordine, suma_initiala_eur: nr(x.suma) }
+                const r = { capitol: x.capitol, cod: x.cod, denumire: x.denumire, descriere_eligibilitate: x.descriere_eligibilitate, mod_calcul: x.mod_calcul, procent: x.procent, ordine: x.ordine, intra_baza_procent: x.intra_baza_procent, suma_initiala_eur: nr(x.suma) }
                 const { error } = x.id ? await supabase.from('pozitii_buget').update(r).eq('id', x.id) : await supabase.from('pozitii_buget').insert({ ...r, contract_id: c.id })
                 if (error) { setLucreaza(false); setMesaj({ cls: 'rosu', text: `Capitolul ${x.cod}: ${error.message}` }); return }
               }
@@ -248,10 +248,12 @@ function FormDate({ c, orgs, progs, editabil, admin, lucreaza, salveaza }: { c: 
 function Buget({ poz, setPoz, areBuget, valoare, moneda, editabil, lucreaza, salveaza, refaDinSablon }: {
   poz: Poz[]; setPoz: (p: Poz[]) => void; areBuget: boolean; valoare: number; moneda: string; editabil: boolean; lucreaza: boolean; salveaza: () => Promise<void>; refaDinSablon: () => Promise<void>
 }) {
-  const baza = useMemo(() => poz.filter(x => x.mod_calcul !== 'procent').reduce((s, x) => s + nr(x.suma), 0), [poz])
+  const baza = useMemo(() => poz.filter(x => x.mod_calcul !== 'procent' && x.intra_baza_procent).reduce((s, x) => s + nr(x.suma), 0), [poz])
   const total = useMemo(() => poz.reduce((s, x) => s + nr(x.suma), 0), [poz])
   const dif = Math.round((valoare - total) * 100) / 100
   const set = (i: number, s: string) => setPoz(poz.map((x, j) => (j === i ? { ...x, suma: s } : x)))
+  const bifa = (i: number, b: boolean) => setPoz(poz.map((x, j) => (j === i ? { ...x, intra_baza_procent: b } : x)))
+  const arePct = poz.some(x => x.mod_calcul === 'procent')
   const calculeaza = () => setPoz(poz.map(x => (x.mod_calcul === 'procent' && x.procent ? { ...x, suma: txt(Math.round(baza * x.procent) / 100) } : x)))
   if (poz.length === 0) return <div className="alerta galben">Programul nu are încă capitole standard în bibliotecă. Administratorul le adaugă în Biblioteca de programe.</div>
   return (
@@ -265,7 +267,8 @@ function Buget({ poz, setPoz, areBuget, valoare, moneda, editabil, lucreaza, sal
               <tr key={x.id ?? x.cod}>
                 <td className="mono"><b>{x.cod}</b></td>
                 <td>{x.denumire}{x.optional && !x.id && <span className="eticheta gri-e">opțional</span>}{x.descriere_eligibilitate && <div className="mic gri">{x.descriere_eligibilitate}</div>}</td>
-                <td className="nowrap">{MOD_CALCUL[x.mod_calcul]}{x.procent != null && ` (${txt(x.procent)}%)`}</td>
+                <td className="nowrap">{MOD_CALCUL[x.mod_calcul]}{x.procent != null && ` (${txt(x.procent)}%)`}
+                  {arePct && x.mod_calcul !== 'procent' && <label className="mic gri" style={{ display: 'block' }}><input type="checkbox" checked={x.intra_baza_procent} disabled={!editabil} onChange={e => bifa(i, e.target.checked)} /> în baza indirectelor</label>}</td>
                 <td className="n"><input style={{ width: 130, textAlign: 'right' }} value={x.suma} disabled={!editabil} onChange={e => set(i, e.target.value)} placeholder="0" /></td>
               </tr>
             ))}
@@ -279,7 +282,7 @@ function Buget({ poz, setPoz, areBuget, valoare, moneda, editabil, lucreaza, sal
         {poz.some(x => x.mod_calcul === 'procent') && <button className="buton-text" onClick={calculeaza}>Calculează capitolele procentuale</button>}
         {areBuget && <button className="buton-text" disabled={lucreaza} onClick={refaDinSablon}>Pornește din nou de la capitolele programului</button>}
       </div>}
-      {poz.some(x => x.mod_calcul === 'procent') && <p className="nota">„Calculează” aplică procentul la toate celelalte capitole. Dacă în contract baza e alta (de exemplu, la Horizon, fără subcontractare), scrieți suma din contract.</p>}
+      {poz.some(x => x.mod_calcul === 'procent') && <p className="nota">„Calculează” aplică procentul la capitolele bifate „în baza indirectelor” (acum {bani(baza, moneda)}). Bifele vin din biblioteca programului (la Horizon, subcontractarea B și sprijinul către terți D.1 nu intră în bază); le puteți schimba dacă contractul spune altfel.</p>}
     </>
   )
 }
