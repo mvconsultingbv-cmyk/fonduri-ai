@@ -45,10 +45,8 @@ export const ECRANE_CONTRACT: Ecran[] = [
 
   { cheie: 'transe', titlu: 'Tranșe de finanțare', grup: 'Buget și raportare', stadiu: 'gata',
     rost: 'Tranșele din contract, legarea fiecărei încasări din extras de tranșa ei și împărțirea banilor primiți pe capitole.' },
-  { cheie: 'buget', titlu: 'Modificări de buget', grup: 'Buget și raportare', stadiu: 'in_lucru',
-    rost: 'Mutări de bani între capitole, prin act adițional sau notificare.',
-    vaFace: ['Înregistrarea unei modificări cu documentul ei.', 'Bugetul în vigoare la orice dată.'],
-    pregatit: ['Tabelele de modificări și bugetul în vigoare calculat automat.'] },
+  { cheie: 'buget', titlu: 'Modificări de buget', grup: 'Buget și raportare', stadiu: 'gata',
+    rost: 'Mutări între capitole și acte adiționale, propuse și aprobate de administrator sau de directorul de program, cu bugetul în vigoare la orice dată.' },
   { cheie: 'raportare', titlu: 'Raportare pe perioade', grup: 'Buget și raportare', stadiu: 'partial',
     rost: 'Situația cheltuielilor pe perioada de raportare, în EUR, la cursul perioadei.',
     vaFace: ['Comparația cu raportul depus la finanțator, pe capitole.', 'Închiderea perioadei: după raportare, nimic din ea nu se mai modifică.'],
@@ -69,7 +67,7 @@ export const ECRANE_ADMIN: Ecran[] = [
     vaFace: ['Formatul extrasului pe bancă și versiuni.', 'Aprobarea unui format nou.'],
     pregatit: ['Tabelele de bănci și formate de extras; BCR e introdusă (în stare „propusă”).'] },
   { cheie: 'utilizatori', titlu: 'Utilizatori și roluri', grup: 'Administrare', stadiu: 'in_lucru',
-    rost: 'Cine are acces la ce contract și cu ce rol (manager, responsabil financiar, cititor).',
+    rost: 'Cine are acces la ce contract și cu ce rol (manager, responsabil financiar, director de program, cititor).',
     vaFace: ['Invitarea unui utilizator nou.', 'Atribuirea rolului pe fiecare contract.', 'Firmele client și contractele lor.'],
     pregatit: ['Rolurile și regulile de acces sunt deja aplicate în baza de date.'] },
 ]
