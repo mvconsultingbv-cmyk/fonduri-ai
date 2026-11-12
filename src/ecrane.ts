@@ -29,10 +29,8 @@ export const ECRANE_CONTRACT: Ecran[] = [
     rost: 'Aferent / neaferent, confirmarea tipului, alocarea pe capitole, cheltuieli indirecte.' },
   { cheie: 'schimburi', titlu: 'Schimburi valutare', grup: 'Bani', stadiu: 'gata',
     rost: 'Fiecare schimb EUR → lei: cursul băncii, cursul BCE din ziua schimbului și cursul programului, cu diferența de curs care nu se decontează.' },
-  { cheie: 'transferuri', titlu: 'Transferuri și cont propriu', grup: 'Bani', stadiu: 'partial',
-    rost: 'Bani mutați între conturile proiectului sau către / dinspre contul propriu al asociației.',
-    vaFace: ['Perechea ieșire–intrare pentru fiecare transfer între conturile proiectului.', 'Motivul fiecărei mișcări cu contul propriu (alimentare, recuperare overhead, recuperare comisioane, returnare).', 'Soldul „datorat” între proiect și asociație.'],
-    pregatit: ['Tabelul de transferuri interne și motivele pentru contul propriu.', 'Tipul se poate deja schimba din ecranul de validare.'] },
+  { cheie: 'transferuri', titlu: 'Transferuri și cont propriu', grup: 'Bani', stadiu: 'gata',
+    rost: 'Perechea ieșire–intrare pentru fiecare transfer între conturile contractului și motivul fiecărei mișcări cu contul propriu al firmei, cu ce datorează proiectul firmei și invers.' },
   { cheie: 'numerar', titlu: 'Numerar și avansuri', grup: 'Bani', stadiu: 'gata',
     rost: 'Fiecare retragere de numerar e un avans: cine are banii, până când, și justificarea cu bonuri/facturi sau redepunere în cont.' },
 

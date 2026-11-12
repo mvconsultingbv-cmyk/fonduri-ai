@@ -11,6 +11,7 @@ import Extrase from './pages/Extrase'
 import Schimburi from './pages/Schimburi'
 import Raportare from './pages/Raportare'
 import Transe from './pages/Transe'
+import Transferuri from './pages/Transferuri'
 import Personal from './pages/Personal'
 import Numerar from './pages/Numerar'
 import Contrapartide from './pages/Contrapartide'
@@ -48,6 +49,7 @@ function Poarta() {
           <Route path="contrapartide" element={<Contrapartide />} />
           <Route path="raportare" element={<Raportare />} />
           <Route path="transe" element={<Transe />} />
+          <Route path="transferuri" element={<Transferuri />} />
           <Route path=":ecran" element={<EcranInLucru />} />
         </Route>
         <Route path="admin" element={<Admin />} />
