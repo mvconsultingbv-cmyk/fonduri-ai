@@ -18,7 +18,7 @@ export function iban(v: string) {
 }
 
 export const STARE_CONTRACT: Record<string, string> = {
-  activ: 'Activ', suspendat: 'Suspendat', finalizat: 'Finalizat', reziliat: 'Reziliat',
+  in_pregatire: 'În pregătire', trimis: 'Trimis spre aprobare', activ: 'Activ', suspendat: 'Suspendat', finalizat: 'Finalizat', reziliat: 'Reziliat',
 }
 
 export const MOD_CALCUL: Record<string, string> = {

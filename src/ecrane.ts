@@ -60,10 +60,8 @@ export const ECRANE_CONTRACT: Ecran[] = [
 export const ECRANE_ADMIN: Ecran[] = [
   { cheie: 'jurnal', titlu: 'Jurnal general', grup: 'Administrare', stadiu: 'gata',
     rost: 'Cine a schimbat ce și când în bibliotecile comune (programe, bănci) și în administrare (utilizatori, firme).' },
-  { cheie: 'programe', titlu: 'Biblioteca de programe', grup: 'Administrare', stadiu: 'in_lucru',
-    rost: 'Regulile fiecărui program de finanțare (Horizon Europe, PNRR, POR etc.), aprobate de M.V. Consulting.',
-    vaFace: ['Regulile programului cu articolul din ghid (curs, eligibilitate, TVA, amortizare).', 'Aprobarea unei reguli noi propuse de aplicație la citirea unui contract.', 'Excepțiile specifice unui contract.'],
-    pregatit: ['Tabelele de programe, reguli și excepții; Horizon Europe e introdus (în stare „propusă”).'] },
+  { cheie: 'programe', titlu: 'Biblioteca de programe', grup: 'Administrare', stadiu: 'gata',
+    rost: 'Fișa fiecărui program de finanțare (Horizon Europe, PNRR, POR etc.): capitolele standard ale bugetului și regulile cu articolul din ghid, cu versiuni și aprobare de M.V. Consulting.' },
   { cheie: 'banci', titlu: 'Biblioteca de bănci', grup: 'Administrare', stadiu: 'in_lucru',
     rost: 'Cum arată extrasele fiecărei bănci, învățat din fiecare extras încărcat.',
     vaFace: ['Formatul extrasului pe bancă și versiuni.', 'Aprobarea unui format nou.'],

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { bani, data, STARE_CONTRACT } from '../lib/format'
+import { useAuth } from '../auth'
 
 type Rand = {
   id: string
@@ -19,6 +20,7 @@ type Rand = {
 export default function Contracte() {
   const [randuri, setRanduri] = useState<Rand[] | null>(null)
   const [eroare, setEroare] = useState<string | null>(null)
+  const { utilizator } = useAuth()
 
   useEffect(() => {
     supabase.from('contracte')
@@ -35,13 +37,15 @@ export default function Contracte() {
       <div className="titlu-pagina">
         <h1>Contracte de finanțare</h1>
         <p>Fiecare contract înseamnă participarea unei firme la un grant, cu contul ei de proiect.</p>
+        {(utilizator?.este_admin_platforma || utilizator?.organizatie_id || (randuri?.length ?? 0) > 0) &&
+          <Link to="/contract-nou" className="buton">+ Contract nou</Link>}
       </div>
       {eroare && <div className="alerta rosu">{eroare}</div>}
       {!randuri && !eroare && <div className="gol">Se încarcă…</div>}
       {randuri?.length === 0 && <div className="gol">Nu aveți încă acces la niciun contract.</div>}
       <div className="grila-contracte">
         {randuri?.map(c => (
-          <Link key={c.id} to={`/contract/${c.id}`} className="card-contract">
+          <Link key={c.id} to={['in_pregatire', 'trimis'].includes(c.stare) ? `/contract-nou/${c.id}` : `/contract/${c.id}`} className="card-contract">
             <div className="card-sus">
               <span className="cod">{c.cod_proiect ?? '—'}</span>
               <span className={`stare stare-${c.stare}`}>{STARE_CONTRACT[c.stare] ?? c.stare}</span>
@@ -50,7 +54,7 @@ export default function Contracte() {
             <div className="detaliu">{c.programe?.denumire} · contract nr. {c.numar_contract}</div>
             <div className="valoare">{bani(c.valoare_finantare_eur, c.programe?.moneda ?? 'EUR')}</div>
             <div className="detaliu">{data(c.data_inceput)} – {data(c.data_sfarsit)}</div>
-            <span className="deschide">Tabloul de bord →</span>
+            <span className="deschide">{['in_pregatire', 'trimis'].includes(c.stare) ? 'Continuă completarea →' : 'Tabloul de bord →'}</span>
           </Link>
         ))}
       </div>

@@ -22,6 +22,8 @@ import Admin from './pages/Admin'
 import Jurnal from './pages/Jurnal'
 import Utilizatori from './pages/Utilizatori'
 import Firme from './pages/Firme'
+import Programe from './pages/Programe'
+import ContractNou from './pages/ContractNou'
 import SeteazaParola from './pages/SeteazaParola'
 
 function Poarta() {
@@ -43,6 +45,8 @@ function Poarta() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<Contracte />} />
+        <Route path="contract-nou" element={<ContractNou />} />
+        <Route path="contract-nou/:id" element={<ContractNou />} />
         <Route path="contract/:id" element={<ContractLayout />}>
           <Route index element={<TabloDeBord />} />
           <Route path="operatiuni" element={<Operatiuni />} />
@@ -65,6 +69,7 @@ function Poarta() {
         <Route path="admin/jurnal" element={<Jurnal general />} />
         <Route path="admin/utilizatori" element={<Utilizatori />} />
         <Route path="admin/firme" element={<Firme />} />
+        <Route path="admin/programe" element={<Programe />} />
         <Route path="admin/:ecran" element={<EcranInLucru admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

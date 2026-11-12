@@ -76,6 +76,8 @@ input:focus { outline: 2px solid var(--navy-2); outline-offset: 0; border-color:
 .stare-activ, .eticheta.verde { background: var(--verde-f); color: var(--verde); }
 .stare-suspendat, .eticheta.galben { background: var(--galben-f); color: var(--galben); }
 .stare-reziliat, .eticheta.rosu { background: var(--rosu-f); color: var(--rosu); }
+.stare-in_pregatire { background: #eef1f5; color: #3a4553; }
+.stare-trimis { background: var(--albastru-f); color: var(--albastru); }
 .stare-finalizat { background: var(--albastru-f); color: var(--albastru); }
 
 /* Alerte */
@@ -300,3 +302,4 @@ td.semnale .eticheta + .eticheta { margin-left: 0; }
 .detalii-jurnal dt { color: var(--gri); min-width: 120px; }
 .detalii-jurnal dd { margin: 0; word-break: break-word; }
 .detalii-jurnal .schimbat { background: var(--galben-f); }
+.titlu-pagina > .buton { display: inline-block; margin-top: 12px; text-decoration: none; }
