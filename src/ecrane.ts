@@ -53,6 +53,8 @@ export const ECRANE_CONTRACT: Ecran[] = [
     pregatit: ['Raportul pe capitole pentru fiecare perioadă, cu E calculat automat și export CSV.', 'Blocarea datelor după închiderea perioadei.'] },
   { cheie: 'jurnal', titlu: 'Jurnal', grup: 'Buget și raportare', stadiu: 'gata',
     rost: 'Cine a schimbat ce și când, cu valoarea veche și cea nouă — pentru audit. Scris automat de baza de date, nu se poate modifica sau șterge.' },
+  { cheie: 'echipa', titlu: 'Echipa contractului', grup: 'Acces', stadiu: 'gata',
+    rost: 'Cine are acces la contract și cu ce rol; managerul și administratorul invită oameni și le schimbă rolul.' },
 ]
 
 export const ECRANE_ADMIN: Ecran[] = [
@@ -66,8 +68,8 @@ export const ECRANE_ADMIN: Ecran[] = [
     rost: 'Cum arată extrasele fiecărei bănci, învățat din fiecare extras încărcat.',
     vaFace: ['Formatul extrasului pe bancă și versiuni.', 'Aprobarea unui format nou.'],
     pregatit: ['Tabelele de bănci și formate de extras; BCR e introdusă (în stare „propusă”).'] },
-  { cheie: 'utilizatori', titlu: 'Utilizatori și roluri', grup: 'Administrare', stadiu: 'in_lucru',
-    rost: 'Cine are acces la ce contract și cu ce rol (manager, responsabil financiar, director de program, cititor).',
-    vaFace: ['Invitarea unui utilizator nou.', 'Atribuirea rolului pe fiecare contract.', 'Firmele client și contractele lor.'],
-    pregatit: ['Rolurile și regulile de acces sunt deja aplicate în baza de date.'] },
+  { cheie: 'utilizatori', titlu: 'Utilizatori și roluri', grup: 'Administrare', stadiu: 'gata',
+    rost: 'Toți oamenii din aplicație, invitarea lor, rolul pe fiecare contract (manager, responsabil financiar, director de program, cititor), link nou, dezactivare.' },
+  { cheie: 'firme', titlu: 'Firme client', grup: 'Administrare', stadiu: 'gata',
+    rost: 'Firmele beneficiare, cu verificarea CUI-ului la ANAF și contractele fiecăreia.' },
 ]

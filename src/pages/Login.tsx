@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, LINK_EXPIRAT } from '../lib/supabase'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [parola, setParola] = useState('')
-  const [eroare, setEroare] = useState<string | null>(null)
+  const [eroare, setEroare] = useState<string | null>(LINK_EXPIRAT ? 'Linkul de activare a expirat sau a fost deja folosit. Cereți un link nou celui care v-a invitat (managerul contractului sau M.V. Consulting).' : null)
   const [trimite, setTrimite] = useState(false)
 
   async function intra(e: FormEvent) {
@@ -36,7 +36,7 @@ export default function Login() {
         </label>
         {eroare && <div className="alerta rosu">{eroare}</div>}
         <button className="buton" disabled={trimite}>{trimite ? 'Se verifică…' : 'Intră în aplicație'}</button>
-        <p className="nota">Conturile se creează doar de administrator. Dacă nu aveți cont, contactați M.V. Consulting.</p>
+        <p className="nota">Conturile se creează prin invitație, de M.V. Consulting sau de managerul contractului. Ați uitat parola? Cereți-le un link nou.</p>
       </form>
     </div>
   )

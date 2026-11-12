@@ -20,17 +20,21 @@ import ContractLayout from './ContractLayout'
 import EcranInLucru from './pages/EcranInLucru'
 import Admin from './pages/Admin'
 import Jurnal from './pages/Jurnal'
+import Utilizatori from './pages/Utilizatori'
+import Firme from './pages/Firme'
+import SeteazaParola from './pages/SeteazaParola'
 
 function Poarta() {
-  const { incarcare, sesiune, utilizator, iesire } = useAuth()
+  const { incarcare, sesiune, utilizator, iesire, parolaNoua } = useAuth()
   if (incarcare) return <div className="gol ecran">Se încarcă…</div>
   if (!sesiune) return <Login />
+  if (parolaNoua && utilizator?.activ) return <SeteazaParola />
   if (!utilizator || !utilizator.activ)
     return (
       <div className="login-pagina">
         <div className="login-card">
           <h2>Cont neactivat</h2>
-          <p>Contul {sesiune.user.email} există, dar nu a fost încă activat de administrator pentru nicio firmă.</p>
+          <p>Contul {sesiune.user.email} nu este activ în aplicație (nu a fost încă înregistrat sau a fost dezactivat). Contactați M.V. Consulting.</p>
           <button className="buton" onClick={iesire}>Ieșire</button>
         </div>
       </div>
@@ -54,10 +58,13 @@ function Poarta() {
           <Route path="transferuri" element={<Transferuri />} />
           <Route path="buget" element={<Buget />} />
           <Route path="jurnal" element={<Jurnal />} />
+          <Route path="echipa" element={<Utilizatori peContract />} />
           <Route path=":ecran" element={<EcranInLucru />} />
         </Route>
         <Route path="admin" element={<Admin />} />
         <Route path="admin/jurnal" element={<Jurnal general />} />
+        <Route path="admin/utilizatori" element={<Utilizatori />} />
+        <Route path="admin/firme" element={<Firme />} />
         <Route path="admin/:ecran" element={<EcranInLucru admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
