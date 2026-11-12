@@ -3,9 +3,10 @@ import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { bani, data, num } from '../lib/format'
 
-// Capitolul A – Personal și pontaje (Horizon Europe, MGA art. 6.2.A, varianta lunară).
+// Capitolul A – Personal și pontaje (varianta lunară).
 //  Cost lunar      = salariul brut + contribuțiile angajatorului (CAM).
-//  Zile disponibile = 215 ÷ 12 × partea din lună lucrată × normă (ore/zi ÷ 8).
+//  Zile disponibile = Z ÷ 12 × partea din lună lucrată × normă (ore/zi ÷ 8),
+//  unde Z = zilele productive pe an din biblioteca de programe (regula „zile_productive_an”; la Horizon Europe, 215).
 //  Rata zilnică    = cost lunar ÷ zile disponibile.
 //  Eligibil        = zilele lucrate pe proiect × rata zilnică (cel mult zilele disponibile).
 //  Cine lucrează EXCLUSIV pe proiect declară toate zilele: eligibil = tot costul lunii.
@@ -38,6 +39,7 @@ export default function Personal() {
   const [ops, setOps] = useState<Op[]>([])
   const [leg, setLeg] = useState<Leg[]>([])
   const [bugetA, setBugetA] = useState<number | null>(null)
+  const [zileAn, setZileAn] = useState<number | null>(null)
   const [eroare, setEroare] = useState<string | null>(null)
   const [mesaj, setMesaj] = useState<{ cls: string; text: string } | null>(null)
   const [lucreaza, setLucreaza] = useState(false)
@@ -47,7 +49,7 @@ export default function Personal() {
 
   const incarca = useCallback(async () => {
     if (!id) return
-    const [p, l, t, o, g, b] = await Promise.all([
+    const [p, l, t, o, g, b, z] = await Promise.all([
       supabase.from('persoane_proiect').select('id,nume,functie,tip_contract,norma_ore_zi,exclusiv_pe_proiect,data_inceput,data_sfarsit,cuvinte_banca,observatii').eq('contract_id', id).order('data_inceput'),
       supabase.from('v_personal_luni').select('*').eq('contract_id', id).order('luna'),
       supabase.from('v_personal_taxe').select('luna,datorate,platite,nr_plati,diferenta').eq('contract_id', id).order('luna'),
@@ -56,10 +58,12 @@ export default function Personal() {
         .in('tip', ['plata_salarii', 'plata_taxe']).order('data_operatiune'),
       supabase.from('personal_plati').select('operatiune_id,tip,luna,persoana_id').eq('contract_id', id),
       supabase.from('v_buget_in_vigoare').select('suma_in_vigoare_eur').eq('contract_id', id).eq('mod_calcul', 'pontaj'),
+      supabase.rpc('valoare_regula', { p_contract: id, p_cod: 'zile_productive_an' }),
     ])
     if (p.error || l.error || t.error || o.error || g.error) { setEroare('Datele nu au putut fi citite.'); return }
     setPers(p.data as Persoana[]); setLuni(l.data as Luna[]); setTaxe(t.data as Taxa[]); setOps(o.data as Op[]); setLeg(g.data as Leg[])
     setBugetA((b.data ?? []).reduce((a, x) => a + Number(x.suma_in_vigoare_eur), 0))
+    setZileAn(z.data == null ? null : Number(z.data))
   }, [id])
   useEffect(() => { incarca() }, [incarca])
 
@@ -100,7 +104,7 @@ export default function Personal() {
       <Link to={`/contract/${id}`} className="inapoi">← Tabloul de bord</Link>
       <section className="titlu-pagina">
         <h1>Personal și pontaje (A)</h1>
-        <p>Pe proiect intră costul fiecărei persoane (salariul brut + contribuția angajatorului), proporțional cu zilele lucrate pe proiect. Regula Horizon: 215 zile productive pe an, adică 17,92 pe lună.</p>
+        <p>Pe proiect intră costul fiecărei persoane (salariul brut + contribuția angajatorului), proporțional cu zilele lucrate pe proiect. {zileAn ? `Regula programului: ${num(zileAn)} zile productive pe an, adică ${num(zileAn / 12)} pe lună.` : ''}</p>
       </section>
 
       <section className="cifre">
@@ -139,7 +143,7 @@ export default function Personal() {
               </div>
             </div>
             {formPers === p.id && <div style={{ padding: '0 16px' }}><FormPersoana contractId={id!} p={p} lucreaza={lucreaza} setLucreaza={setLucreaza} inchide={() => setFormPers(null)} gata={gata} /></div>}
-            {lunaNoua === p.id && <div style={{ padding: '0 16px' }}><FormLuna p={p} ultima={lp[lp.length - 1]} lucreaza={lucreaza} setLucreaza={setLucreaza} inchide={() => setLunaNoua(null)} gata={gata} /></div>}
+            {lunaNoua === p.id && <div style={{ padding: '0 16px' }}><FormLuna p={p} zileAn={zileAn} ultima={lp[lp.length - 1]} lucreaza={lucreaza} setLucreaza={setLucreaza} inchide={() => setLunaNoua(null)} gata={gata} /></div>}
             <div className="tabel-wrap">
               <table className="tabel-op">
                 <thead><tr>
@@ -163,7 +167,7 @@ export default function Personal() {
                         <td className="nowrap"><button className="link-mic" onClick={() => setEditLuna(editLuna === l.id ? null : l.id)}>modifică</button></td>
                       </tr>
                       {editLuna === l.id && <tr className="rand-detaliu"><td colSpan={11}>
-                        <FormLuna p={p} l={l} lucreaza={lucreaza} setLucreaza={setLucreaza} inchide={() => setEditLuna(null)} gata={gata} sterge={() => stergeLuna(l, p)} />
+                        <FormLuna p={p} zileAn={zileAn} l={l} lucreaza={lucreaza} setLucreaza={setLucreaza} inchide={() => setEditLuna(null)} gata={gata} sterge={() => stergeLuna(l, p)} />
                       </td></tr>}
                     </Fragment>
                   ))}
@@ -216,7 +220,7 @@ export default function Personal() {
           </tbody></table></details>}
       </section>
 
-      <p className="nota">Eligibilul în EUR folosește cursul de referință al perioadei în care cade luna salariului. Plafonul Horizon de 215 zile pe an e respectat automat: într-o lună nu se pot declara mai mult de 17,92 zile (proporțional cu norma și partea din lună lucrată). Un pontaj (sau declarația de lucru exclusiv) trebuie păstrat pentru fiecare persoană, semnat de persoană și de coordonator.</p>
+      <p className="nota">Eligibilul în EUR folosește cursul de referință al perioadei în care cade luna salariului. {zileAn ? `Plafonul programului de ${num(zileAn)} zile pe an e respectat automat: într-o lună nu se pot declara mai mult de ${num(zileAn / 12)} zile (proporțional cu norma și partea din lună lucrată).` : ''} Un pontaj (sau declarația de lucru exclusiv) trebuie păstrat pentru fiecare persoană, semnat de persoană și de coordonator.</p>
     </>
   )
 }
@@ -270,8 +274,8 @@ function calculStandard(brut: number) {
   return { contrib: cas + cass, imp, net: brut - cas - cass - imp, cam: Math.round(brut * 0.0225) }
 }
 
-function FormLuna({ p, l, ultima, lucreaza, setLucreaza, inchide, gata, sterge }: {
-  p: Persoana; l?: Luna; ultima?: Luna; lucreaza: boolean; setLucreaza: (b: boolean) => void; inchide: () => void; gata: (t: string) => Promise<void>; sterge?: () => void
+function FormLuna({ p, zileAn, l, ultima, lucreaza, setLucreaza, inchide, gata, sterge }: {
+  p: Persoana; zileAn: number | null; l?: Luna; ultima?: Luna; lucreaza: boolean; setLucreaza: (b: boolean) => void; inchide: () => void; gata: (t: string) => Promise<void>; sterge?: () => void
 }) {
   const urm = ultima ? (() => { const d = new Date(ultima.luna); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 7) })() : p.data_inceput.slice(0, 7)
   const baza = l ?? ultima
@@ -284,7 +288,7 @@ function FormLuna({ p, l, ultima, lucreaza, setLucreaza, inchide, gata, sterge }
     const c = calculStandard(nr(v.brut)); setV(x => ({ ...x, contrib: txt(c.contrib), imp: txt(c.imp), net: txt(c.net), cam: txt(c.cam) }))
   }
   const fr = nr(v.fractie) / 100
-  const zileDisp = 215 / 12 * fr * Number(p.norma_ore_zi) / 8
+  const zileDisp = zileAn == null ? null : zileAn / 12 * fr * Number(p.norma_ore_zi) / 8
   async function salveaza() {
     setEroare(null)
     const brut = nr(v.brut)
@@ -293,7 +297,8 @@ function FormLuna({ p, l, ultima, lucreaza, setLucreaza, inchide, gata, sterge }
     if (!(fr > 0 && fr <= 1)) return setEroare('Partea din lună lucrată: între 1% și 100%.')
     const zile = v.zile.trim() === '' ? null : nr(v.zile)
     if (zile != null && !(zile >= 0)) return setEroare('Zilele pe proiect: un număr (poate avea zecimale).')
-    if (zile != null && zile > zileDisp + 0.005) return setEroare(`În această lună se pot declara cel mult ${num(zileDisp)} zile (215 ÷ 12 × partea din lună × normă).`)
+    if (zileDisp == null) return setEroare('Programul acestui contract nu are definită regula zilelor productive pe an. Adaug-o în biblioteca de programe înainte de a introduce salarii.')
+    if (zile != null && zile > zileDisp + 0.005) return setEroare(`În această lună se pot declara cel mult ${num(zileDisp)} zile (${num(zileAn)} ÷ 12 × partea din lună × normă).`)
     const rand = { luna: `${v.luna}-01`, salariu_brut: brut, contributii_angajat: nr(v.contrib), impozit: nr(v.imp), salariu_net: nr(v.net), contributii_angajator: nr(v.cam),
       fractie_luna: Math.round(fr * 10000) / 10000, zile_proiect: zile, confirmat: v.confirmat, sursa: v.confirmat ? 'stat_de_plata' : (l?.sursa ?? 'stat_de_plata'), observatii: v.obs.trim() || null }
     setLucreaza(true)
@@ -313,11 +318,11 @@ function FormLuna({ p, l, ultima, lucreaza, setLucreaza, inchide, gata, sterge }
         <label>Salariu net (lei)<input inputMode="decimal" value={v.net} onChange={e => set('net', e.target.value)} /></label>
         <label>CAM – angajator (lei)<input inputMode="decimal" value={v.cam} onChange={e => set('cam', e.target.value)} /></label>
         <label>Partea din lună lucrată (%)<input inputMode="decimal" value={v.fractie} onChange={e => set('fractie', e.target.value)} /></label>
-        <label>Zile lucrate pe proiect{p.exclusiv_pe_proiect ? ' (nu e nevoie: exclusiv)' : ''}<input inputMode="decimal" value={v.zile} disabled={p.exclusiv_pe_proiect} onChange={e => set('zile', e.target.value)} placeholder={`max. ${num(zileDisp)}`} /></label>
+        <label>Zile lucrate pe proiect{p.exclusiv_pe_proiect ? ' (nu e nevoie: exclusiv)' : ''}<input inputMode="decimal" value={v.zile} disabled={p.exclusiv_pe_proiect} onChange={e => set('zile', e.target.value)} placeholder={zileDisp == null ? 'regulă lipsă' : `max. ${num(zileDisp)}`} /></label>
         <label className="lat2 bifa-camp"><input type="checkbox" checked={v.confirmat} onChange={e => set('confirmat', e.target.checked)} /> Sumele sunt verificate cu statul de plată</label>
         <label className="lat2">Observații<input value={v.obs} onChange={e => set('obs', e.target.value)} /></label>
       </div>
-      <p className="mic">Cost lunar {num(cost)} lei · zile disponibile {num(zileDisp)} · rată zilnică {zileDisp > 0 ? num(cost / zileDisp) : '—'} lei.
+      <p className="mic">Cost lunar {num(cost)} lei · zile disponibile {zileDisp == null ? '—' : num(zileDisp)} · rată zilnică {zileDisp ? num(cost / zileDisp) : '—'} lei.
         {' '}<button className="link-mic" type="button" onClick={recalculeaza}>calculează taxele din brut</button></p>
       {eroare && <div className="alerta rosu">{eroare}</div>}
       <div className="rand-butoane">
