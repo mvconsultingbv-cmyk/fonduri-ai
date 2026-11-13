@@ -129,8 +129,8 @@ export default function Extrase() {
       setCoada(c => c.map(z => z.cheie === el.cheie ? { ...z, stare: 'gata', mesaj: `Fișierul nu a putut fi urcat: ${up.error.message}` } : z))
       return false
     }
-    const { operatiuni, avertismente: _a, banca: _b, titular: _t, cui_titular: _c, data_emitere: _d, ...antet } = x
-    void _a; void _b; void _t; void _c; void _d
+    const { operatiuni, avertismente: _a, banca: _b, titular: _t, cui_titular: _c, data_emitere: _d, control_randuri: _r, ...antet } = x
+    void _a; void _b; void _t; void _c; void _d; void _r
     const r = await supabase.rpc('incarca_extras', {
       p_cont: cont.id,
       p_extras: { ...antet, fisier_cale: cale, fisier_amprenta: el.hash },

@@ -34,6 +34,8 @@ export type ExtrasCitit = {
   total_credit: number
   operatiuni: OperatiuneCitita[]
   avertismente: string[]
+  // doar la băncile care tipăresc soldul după fiecare operațiune (de ex. ING): rândurile la care soldul refăcut nu se potrivește
+  control_randuri?: { verificate: number; gresite: number[] }
 }
 
 // Coloanele extrasului BCR (poziția x pe pagină, în puncte PDF)
@@ -186,6 +188,12 @@ export function verifica(e: ExtrasCitit) {
     { ok: rot(e.sold_initial - e.total_debit + e.total_credit) === rot(e.sold_final), text: 'Sold inițial − debit + credit = sold final' },
     { ok: sumD === rot(e.total_debit), text: `Suma plăților citite (${sumD}) = totalul debit din extras` },
     { ok: sumC === rot(e.total_credit), text: `Suma încasărilor citite (${sumC}) = totalul credit din extras` },
+    ...(e.control_randuri ? [{
+      ok: e.control_randuri.gresite.length === 0,
+      text: e.control_randuri.gresite.length === 0
+        ? `Soldul după fiecare operațiune = soldul tipărit de bancă (${e.control_randuri.verificate} din ${e.control_randuri.verificate} rânduri)`
+        : `Soldul după operațiune nu se potrivește cu cel tipărit de bancă la rândurile: ${e.control_randuri.gresite.join(', ')}`,
+    }] : []),
   ]
 }
 

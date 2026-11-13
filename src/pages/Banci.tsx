@@ -134,7 +134,7 @@ export default function Banci() {
                       <td className="mono">v{f.versiune}</td>
                       <td>{f.denumire}{f.observatii && <div className="mic gri">{f.observatii}</div>}</td>
                       <td className="mic">{CITITOARE[f.structura.cititor] ?? f.structura.cititor}</td>
-                      <td className="mic">{f.structura.cititor === 'MT940' ? SOLD_DATA[f.structura.sold_initial_data ?? 'ziua_anterioara'] : 'coloanele și antetul extrasului BCR'}</td>
+                      <td className="mic">{f.structura.cititor === 'MT940' ? SOLD_DATA[f.structura.sold_initial_data ?? 'ziua_anterioara'] : f.structura.cititor === 'ING_PDF_V1' ? 'coloanele extrasului ING; soldul verificat după fiecare operațiune' : 'coloanele și antetul extrasului BCR'}</td>
                       <td className="nowrap">{f.valabil_de_la ? data(f.valabil_de_la) : '—'}</td>
                       <td><span className={`eticheta ${STARE[f.stare].cls}`}>{STARE[f.stare].text}{f.aprobat_la ? ` ${data(f.aprobat_la)}` : ''}</span></td>
                       <td className="n nowrap">
@@ -274,7 +274,9 @@ function FormFormat({ f, versiuneNoua, inchide, salveaza }: { f?: Format & { obs
       {versiuneNoua && <div className="alerta galben" style={{ gridColumn: '1 / -1' }}>Versiune nouă a formatului „{f?.denumire}”. Intră ca propusă; versiunea veche rămâne aprobată până o retrageți.</div>}
       <label>Denumire<input value={v.denumire} onChange={e => set('denumire', e.target.value)} placeholder="ING – extras MT940 (Home'Bank)" /></label>
       <label>Cititor<select value={v.cititor} onChange={e => set('cititor', e.target.value)}>{Object.entries(CITITOARE).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>
-        {v.cititor === 'BCR_PDF_V1' && <span className="mic gri">Doar pentru extrasele PDF ale BCR. Pentru PDF-urile altor bănci e nevoie de un cititor nou, scris și testat într-o sesiune separată.</span>}</label>
+        {v.cititor === 'BCR_PDF_V1' && <span className="mic gri">Doar pentru extrasele PDF ale BCR.</span>}
+        {v.cititor === 'ING_PDF_V1' && <span className="mic gri">Doar pentru extrasele PDF ING Business. Verifică soldul după fiecare operațiune.</span>}
+        {v.cititor !== 'MT940' && <span className="mic gri">Pentru PDF-urile altor bănci e nevoie de un cititor nou, scris și testat într-o sesiune separată.</span>}</label>
       {v.cititor === 'MT940' && <label>Data soldului inițial<select value={v.sold} onChange={e => set('sold', e.target.value)}>{Object.entries(SOLD_DATA).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>
         <span className="mic gri">Hotărăște ziua de început a extrasului. Dacă proba arată prima zi greșit, schimbați setarea.</span></label>}
       <label>Valabil de la<input type="date" value={v.valabil} onChange={e => set('valabil', e.target.value)} /></label>

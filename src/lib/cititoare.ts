@@ -1,17 +1,19 @@
 // Alegerea cititorului de extras, după Biblioteca de bănci.
 // Fiecare bancă are unul sau mai multe formate de extras; fiecare format spune ce cititor folosește:
 //   BCR_PDF_V1 – PDF-ul BCR (George / BCR Business)
+//   ING_PDF_V1 – PDF-ul ING Business (ING nu exportă MT940 pentru firme)
 //   MT940      – standardul SWIFT, comun majorității băncilor (cu setări pe bancă, de ex. data soldului inițial)
 // Un fișier PDF merge la cititorul PDF; un fișier text merge la MT940. Banca se află din IBAN-ul extrasului
 // (contul contractului), iar formatul trebuie să fie al băncii contului.
 
 import { citesteExtrasBCR, type ContContract, type ExtrasCitit } from './extrasBCR'
 import { citesteExtrasMT940, pareMT940, type SetariMT940 } from './extrasMT940'
+import { citesteExtrasING, pareING } from './extrasING'
 import { textCuPozitii } from './pdfText'
 
 export type Format = {
   id: string; banca_id: string; versiune: number; denumire: string; tip_fisier: string
-  structura: { cititor: 'BCR_PDF_V1' | 'MT940' } & SetariMT940 & Record<string, unknown>
+  structura: { cititor: 'BCR_PDF_V1' | 'ING_PDF_V1' | 'MT940' } & SetariMT940 & Record<string, unknown>
   stare: 'propusa' | 'aprobata' | 'retrasa'; valabil_de_la: string | null
 }
 export type ContCunoscut = ContContract & { banca_id: string }
@@ -19,8 +21,11 @@ export type Citire = { extras: ExtrasCitit; format: Format | null; problema: str
 
 export const CITITOARE: Record<string, string> = {
   BCR_PDF_V1: 'PDF BCR (George / BCR Business)',
+  ING_PDF_V1: 'PDF ING Business',
   MT940: 'MT940 (standard SWIFT, orice bancă)',
 }
+
+export const PDF_CITITOARE: string[] = ['BCR_PDF_V1', 'ING_PDF_V1']
 
 export const ePdf = (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name)
 
@@ -43,10 +48,13 @@ export async function citesteFisier(f: File, buf: ArrayBuffer, conturi: ContCuno
   const fmt = formate.filter(x => !doarAprobate || x.stare === 'aprobata')
   const bancaCont = (iban: string) => bancaProba ?? conturi.find(c => c.iban === iban)?.banca_id
   if (ePdf(f)) {
-    if (!fmt.some(x => x.structura.cititor === 'BCR_PDF_V1')) throw new Error('Nicio bancă din bibliotecă nu are un format PDF aprobat.')
-    const x = citesteExtrasBCR(await textCuPozitii(buf), conturi)
-    const format = formatPentru(fmt, bancaCont(x.iban), 'BCR_PDF_V1', x.data_sfarsit)
-    return [{ extras: x, format, problema: format ? null : 'Extrasul pare BCR (PDF), dar banca acestui cont nu are un format PDF BCR aprobat în Biblioteca de bănci.' }]
+    if (!fmt.some(x => PDF_CITITOARE.includes(x.structura.cititor))) throw new Error('Nicio bancă din bibliotecă nu are un format PDF aprobat.')
+    const el = await textCuPozitii(buf)
+    // banca se recunoaște din conținutul PDF-ului; fiecare bancă are cititorul ei
+    const [cititor, nume] = pareING(el) ? ['ING_PDF_V1', 'ING'] as const : ['BCR_PDF_V1', 'BCR'] as const
+    const x = cititor === 'ING_PDF_V1' ? citesteExtrasING(el, conturi) : citesteExtrasBCR(el, conturi)
+    const format = formatPentru(fmt, bancaCont(x.iban), cititor, x.data_sfarsit)
+    return [{ extras: x, format, problema: format ? null : `Extrasul pare ${nume} (PDF), dar banca acestui cont nu are un format „${CITITOARE[cititor]}” ${doarAprobate ? 'aprobat ' : ''}în Biblioteca de bănci.` }]
   }
   const text = textDinFisier(buf)
   if (!pareMT940(text)) throw new Error('Fișierul nu e nici PDF, nici MT940. Formatele acceptate sunt cele din Biblioteca de bănci.')
