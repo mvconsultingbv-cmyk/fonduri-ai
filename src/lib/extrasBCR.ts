@@ -19,7 +19,7 @@ export type OperatiuneCitita = {
 }
 
 export type ExtrasCitit = {
-  banca: 'BCR'
+  banca: string
   numar: string
   data_emitere: string | null
   data_inceput: string

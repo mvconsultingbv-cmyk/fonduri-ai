@@ -2,17 +2,19 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { bani, data, iban as fmtIban, num } from '../lib/format'
-import { citesteExtrasBCR, rot, verifica, type ExtrasCitit } from '../lib/extrasBCR'
-import { amprenta, textCuPozitii } from '../lib/pdfText'
+import { rot, verifica, type ExtrasCitit } from '../lib/extrasBCR'
+import { amprenta } from '../lib/pdfText'
+import { citesteFisier, ePdf, type Format } from '../lib/cititoare'
 
-// Extrasele de cont: lanțul de solduri pe fiecare cont și încărcarea extraselor noi (PDF).
-// PDF-ul e citit în browser; înainte de salvare se arată tot ce s-a citit și verificările.
+// Extrasele de cont: lanțul de solduri pe fiecare cont și încărcarea extraselor noi (PDF sau MT940).
+// Cititorul se alege după Biblioteca de bănci: doar formatele aprobate ale băncii contului.
+// Fișierul e citit în browser; înainte de salvare se arată tot ce s-a citit și verificările.
 // Salvarea (extras + operațiuni) se face într-un singur pas în baza de date, care mai verifică o dată:
 // dubluri, perioade suprapuse, totaluri, lanțul de solduri, perioada contului mixt.
 
 type Cont = {
   id: string; iban: string; moneda: string; denumire: string | null; sold_deschidere: number; data_deschidere: string
-  activ: boolean; mixt_de_la: string | null; mixt_pana_la: string | null
+  banca_id: string; activ: boolean; mixt_de_la: string | null; mixt_pana_la: string | null
 }
 type Extras = {
   id: string; cont_id: string; numar: string; data_inceput: string; data_sfarsit: string; sold_initial: number; sold_final: number
@@ -21,7 +23,7 @@ type Extras = {
 type Verif = { ok: boolean | null; text: string }
 type Element = {
   cheie: string; nume: string; stare: 'citesc' | 'gata' | 'eroare' | 'salvez' | 'salvat'; mesaj?: string
-  extras?: ExtrasCitit; cont?: Cont; fisier?: File; hash?: string; verif?: Verif[]; deschis?: boolean
+  extras?: ExtrasCitit; cont?: Cont; fisier?: File; hash?: string; verif?: Verif[]; deschis?: boolean; format?: Format
 }
 
 const TIP: Record<string, string> = {
@@ -42,10 +44,16 @@ export default function Extrase() {
   const [eroare, setEroare] = useState<string | null>(null)
   const [coada, setCoada] = useState<Element[]>([])
   const [mesaj, setMesaj] = useState<{ cls: string; text: string } | null>(null)
+  const [formate, setFormate] = useState<Format[]>([])
+
+  useEffect(() => {
+    supabase.from('formate_extras').select('id,banca_id,versiune,denumire,tip_fisier,structura,stare,valabil_de_la').eq('stare', 'aprobata')
+      .then(r => setFormate((r.data ?? []) as Format[]))
+  }, [])
 
   const incarca = useCallback(async () => {
     if (!id) return
-    const c = await supabase.from('conturi').select('id,iban,moneda,denumire,sold_deschidere,data_deschidere,activ,mixt_de_la,mixt_pana_la').eq('contract_id', id).order('moneda').order('data_deschidere')
+    const c = await supabase.from('conturi').select('id,iban,moneda,denumire,sold_deschidere,data_deschidere,banca_id,activ,mixt_de_la,mixt_pana_la').eq('contract_id', id).order('moneda').order('data_deschidere')
     if (c.error) { setEroare('Conturile nu au putut fi citite.'); return }
     const ids = (c.data ?? []).map(x => x.id)
     const e = ids.length ? await supabase.from('extrase').select('id,cont_id,numar,data_inceput,data_sfarsit,sold_initial,sold_final,total_debit,total_credit,fisier_cale,fisier_amprenta,incarcat_la').in('cont_id', ids).order('data_inceput') : { data: [], error: null }
@@ -85,33 +93,38 @@ export default function Extrase() {
     setCoada(c => [...noi, ...c])
     for (const el of noi) {
       const f = el.fisier!
-      let rez: Partial<Element>
+      let rez: Partial<Element>[]
       try {
-        if (f.type && f.type !== 'application/pdf') throw new Error('Nu e un fișier PDF.')
         const buf = await f.arrayBuffer()
-        const hash = await amprenta(buf)
-        const deja = extrase.find(e => e.fisier_amprenta === hash)
-        if (deja) throw new Error(`Fișierul e deja încărcat (extrasul nr. ${deja.numar}, ${data(deja.data_inceput)} – ${data(deja.data_sfarsit)}).`)
-        if (coada.some(c => c.hash === hash)) throw new Error('Același fișier e deja în lista de mai jos.')
-        const text = await textCuPozitii(buf)
-        const x = citesteExtrasBCR(text, conturi.map(c => ({ iban: c.iban, proiect_pana_la: c.mixt_pana_la })))
-        const cont = conturi.find(c => c.iban === x.iban)
-        if (!cont) throw new Error(`Extrasul e pentru contul ${fmtIban(x.iban)}, care nu e un cont al acestui contract.`)
-        if (cont.moneda !== x.moneda) throw new Error(`Extrasul e în ${x.moneda}, contul e în ${cont.moneda}.`)
-        const verif: Verif[] = [...verifica(x), verificaLant(x, cont), ...x.avertismente.map(a => ({ ok: null, text: a }))]
-        rez = { stare: 'gata', extras: x, cont, hash, verif, deschis: true }
+        const hashFisier = await amprenta(buf)
+        if (coada.some(c => c.hash?.startsWith(hashFisier))) throw new Error('Același fișier e deja în lista de mai jos.')
+        const citiri = await citesteFisier(f, buf, conturi.map(c => ({ iban: c.iban, proiect_pana_la: c.mixt_pana_la, banca_id: c.banca_id })), formate)
+        // un fișier MT940 poate avea extrasele mai multor conturi: fiecare devine un rând separat
+        rez = citiri.map(({ extras: x, format, problema }) => {
+          const hash = citiri.length > 1 ? `${hashFisier}-${x.iban.slice(-6)}` : hashFisier
+          const deja = extrase.find(e => e.fisier_amprenta === hash)
+          if (deja) return { stare: 'eroare', mesaj: `Fișierul e deja încărcat (extrasul nr. ${deja.numar}, ${data(deja.data_inceput)} – ${data(deja.data_sfarsit)}).` }
+          const cont = conturi.find(c => c.iban === x.iban)
+          if (!cont) return { stare: 'eroare', mesaj: `Extrasul e pentru contul ${fmtIban(x.iban)}, care nu e un cont al acestui contract.` }
+          if (cont.moneda !== x.moneda) return { stare: 'eroare', mesaj: `Extrasul contului ${fmtIban(x.iban)} e în ${x.moneda}, contul e în ${cont.moneda}.` }
+          if (!format) return { stare: 'eroare', mesaj: problema ?? 'Formatul extrasului nu e aprobat.' }
+          const verif: Verif[] = [...verifica(x), verificaLant(x, cont), ...x.avertismente.map(a => ({ ok: null, text: a }))]
+          return { stare: 'gata', extras: x, cont, hash, verif, deschis: true, format }
+        })
       } catch (e) {
-        rez = { stare: 'eroare', mesaj: e instanceof Error ? e.message : String(e) }
+        rez = [{ stare: 'eroare', mesaj: e instanceof Error ? e.message : String(e) }]
       }
-      setCoada(c => c.map(z => z.cheie === el.cheie ? { ...z, ...rez } : z))
+      const [primul, ...altele] = rez
+      setCoada(c => [...altele.map((r, k) => ({ ...el, ...r, cheie: `${el.cheie}-${k + 1}` }) as Element), ...c.map(z => z.cheie === el.cheie ? { ...z, ...primul } : z)])
     }
   }
 
   async function salveaza(el: Element): Promise<boolean> {
     const x = el.extras!, cont = el.cont!
     setCoada(c => c.map(z => z.cheie === el.cheie ? { ...z, stare: 'salvez', mesaj: undefined } : z))
-    const cale = `${id}/${cont.id}/${el.hash}.pdf`
-    const up = await supabase.storage.from('extrase').upload(cale, el.fisier!, { contentType: 'application/pdf', upsert: false })
+    const pdf = ePdf(el.fisier!)
+    const cale = `${id}/${cont.id}/${el.hash}.${pdf ? 'pdf' : 'sta'}`
+    const up = await supabase.storage.from('extrase').upload(cale, el.fisier!, { contentType: pdf ? 'application/pdf' : 'text/plain', upsert: false })
     if (up.error && !/exists|duplicate/i.test(up.error.message)) {
       setCoada(c => c.map(z => z.cheie === el.cheie ? { ...z, stare: 'gata', mesaj: `Fișierul nu a putut fi urcat: ${up.error.message}` } : z))
       return false
@@ -122,6 +135,7 @@ export default function Extrase() {
       p_cont: cont.id,
       p_extras: { ...antet, fisier_cale: cale, fisier_amprenta: el.hash },
       p_operatiuni: operatiuni.map(o => ({ ...o, referinta: o.referinta || null })),
+      p_format: el.format!.id,
     })
     if (r.error) {
       setCoada(c => c.map(z => z.cheie === el.cheie ? { ...z, stare: 'gata', mesaj: r.error.message } : z))
@@ -185,10 +199,10 @@ export default function Extrase() {
 
       <section className="bloc">
         <div className="bloc-titlu"><h2>Încarcă extrase noi</h2>
-          <p>PDF-urile descărcate din George / BCR Business. Le puteți alege pe mai multe deodată, în orice ordine: aplicația recunoaște contul după IBAN și le așază în ordinea datelor.</p></div>
+          <p>Extrasele descărcate din internet banking: PDF (la BCR) sau MT940 (fișierul standard pe care îl exportă majoritatea băncilor). Le puteți alege pe mai multe deodată, în orice ordine: aplicația recunoaște contul după IBAN și le așază în ordinea datelor.</p></div>
         <label className="zona-incarcare">
-          <input type="file" accept="application/pdf,.pdf" multiple onChange={e => { adaugaFisiere(e.target.files); e.target.value = '' }} />
-          <span>Alege extrasele (PDF)</span>
+          <input type="file" accept="application/pdf,.pdf,.sta,.txt,.940,.mt940,.mt9" multiple onChange={e => { adaugaFisiere(e.target.files); e.target.value = '' }} />
+          <span>Alege extrasele (PDF sau MT940)</span>
           <span className="mic gri">Fișierul e citit pe calculatorul dvs.; se urcă doar când apăsați „Salvează”.</span>
         </label>
         {mesaj && <div className={`alerta ${mesaj.cls}`} style={{ marginTop: 12 }}>{mesaj.text}{mesaj.cls === 'verde' && <> <Link className="link-mic" to={`/contract/${id}/operatiuni`}>Deschide validarea →</Link></>}</div>}
@@ -246,7 +260,7 @@ export default function Extrase() {
           </div>
         </section>
       ))}
-      <p className="nota">Formatul acceptat acum: extrasele BCR în PDF. Pentru o bancă nouă, primul extras se trimite la M.V. Consulting, care adaugă formatul băncii în bibliotecă.</p>
+      <p className="nota">Se acceptă formatele aprobate în Biblioteca de bănci{formate.length ? `: ${formate.map(f => f.denumire).join(' · ')}` : ''}. Pentru o bancă nouă, primul extras se trimite la M.V. Consulting, care verifică formatul băncii și îl aprobă.</p>
     </>
   )
 }

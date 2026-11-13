@@ -23,6 +23,7 @@ import Jurnal from './pages/Jurnal'
 import Utilizatori from './pages/Utilizatori'
 import Firme from './pages/Firme'
 import Programe from './pages/Programe'
+import Banci from './pages/Banci'
 import ContractNou from './pages/ContractNou'
 import SeteazaParola from './pages/SeteazaParola'
 
@@ -70,6 +71,7 @@ function Poarta() {
         <Route path="admin/utilizatori" element={<Utilizatori />} />
         <Route path="admin/firme" element={<Firme />} />
         <Route path="admin/programe" element={<Programe />} />
+        <Route path="admin/banci" element={<Banci />} />
         <Route path="admin/:ecran" element={<EcranInLucru admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

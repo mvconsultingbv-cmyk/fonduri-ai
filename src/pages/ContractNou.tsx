@@ -14,7 +14,7 @@ import { bani, data, iban as fIban, MOD_CALCUL, num, STARE_CONTRACT, TIP_TRANSA 
 
 type Org = { id: string; denumire: string; cui: string | null }
 type Prog = { id: string; denumire: string; moneda: string; stare: string }
-type Banca = { id: string; denumire: string }
+type Banca = { id: string; denumire: string; cod_iban: string | null }
 type Contract = { id: string; organizatie_id: string; program_id: string; numar_contract: string; cod_proiect: string | null; titlu: string; valoare_finantare_eur: number; data_semnare: string | null; data_inceput: string; data_sfarsit: string; stare: string; trimis_la: string | null }
 type Poz = { id?: string; capitol: string; cod: string; denumire: string; descriere_eligibilitate: string | null; mod_calcul: string; procent: number | null; ordine: number; suma: string; optional?: boolean; intra_baza_procent: boolean }
 type Per = { id: string; numar: number; data_inceput: string; data_sfarsit: string }
@@ -56,7 +56,7 @@ export default function ContractNou() {
     const [o, p, b] = await Promise.all([
       supabase.from('organizatii').select('id,denumire,cui').order('denumire'),
       supabase.from('programe').select('id,denumire,moneda,stare').neq('stare', 'retrasa').order('denumire'),
-      supabase.from('banci').select('id,denumire').neq('stare', 'retrasa').order('denumire'),
+      supabase.from('banci').select('id,denumire,cod_iban').neq('stare', 'retrasa').order('denumire'),
     ])
     setOrgs((o.data ?? []) as Org[]); setProgs((p.data ?? []) as Prog[]); setBanci((b.data ?? []) as Banca[])
     if (id) {
@@ -319,15 +319,18 @@ function Perioade({ per, c, editabil, lucreaza, adauga, sterge }: { per: Per[]; 
 }
 
 function Conturi({ conturi, banci, c, moneda, editabil, lucreaza, adauga, sterge }: { conturi: Cont[]; banci: Banca[]; c: Contract; moneda: string; editabil: boolean; lucreaza: boolean; adauga: (r: object) => Promise<boolean>; sterge: (id: string) => Promise<boolean> }) {
-  const [v, setV] = useState({ iban: '', moneda, banca_id: banci[0]?.id ?? '', denumire: '', data_deschidere: c.data_inceput, sold: '' })
+  const [v, setV] = useState({ iban: '', moneda, banca_id: '', denumire: '', data_deschidere: c.data_inceput, sold: '' })
   const [eroare, setEroare] = useState<string | null>(null)
   const set = (k: string, x: string) => setV(o => ({ ...o, [k]: x }))
+  // banca se recunoaște din IBAN (RO: caracterele 5–8), după codurile din Biblioteca de bănci
+  const ibCurat = v.iban.replace(/\s/g, '').toUpperCase()
+  const recunoscuta = ibCurat.startsWith('RO') && ibCurat.length >= 8 ? banci.find(b => b.cod_iban === ibCurat.slice(4, 8)) : undefined
   async function trimite() {
     setEroare(null)
     const ib = v.iban.replace(/\s/g, '').toUpperCase()
     if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/.test(ib)) return setEroare('IBAN-ul nu pare corect (ex. RO49 AAAA 1B31 0075 9384 0000).')
-    if (!v.banca_id) return setEroare('Alegeți banca.')
-    if (await adauga({ iban: ib, moneda: v.moneda.trim().toUpperCase(), banca_id: v.banca_id, denumire: v.denumire.trim() || null, data_deschidere: v.data_deschidere, sold_deschidere: nr(v.sold) }))
+    if (!v.banca_id && !recunoscuta) return setEroare(ib.startsWith('RO') ? `Banca cu codul ${ib.slice(4, 8)} nu e încă în biblioteca de bănci. Cereți-i lui M.V. Consulting să o adauge.` : 'Alegeți banca.')
+    if (await adauga({ iban: ib, moneda: v.moneda.trim().toUpperCase(), banca_id: v.banca_id || recunoscuta?.id, denumire: v.denumire.trim() || null, data_deschidere: v.data_deschidere, sold_deschidere: nr(v.sold) }))
       setV(o => ({ ...o, iban: '', denumire: '', sold: '' }))
   }
   return (
@@ -340,7 +343,7 @@ function Conturi({ conturi, banci, c, moneda, editabil, lucreaza, adauga, sterge
         <div className="campuri">
           <label className="lat2">IBAN<input value={v.iban} onChange={e => set('iban', e.target.value)} /></label>
           <label>Moneda<select value={v.moneda} onChange={e => set('moneda', e.target.value)}>{[...new Set([moneda, 'EUR', 'RON'])].map(m => <option key={m}>{m}</option>)}</select></label>
-          <label>Banca<select value={v.banca_id} onChange={e => set('banca_id', e.target.value)}><option value="">— alegeți —</option>{banci.map(b => <option key={b.id} value={b.id}>{b.denumire}</option>)}</select></label>
+          <label>Banca<select value={v.banca_id} onChange={e => set('banca_id', e.target.value)}><option value="">{recunoscuta ? `${recunoscuta.denumire} (din IBAN)` : '— din IBAN / alegeți —'}</option>{banci.map(b => <option key={b.id} value={b.id}>{b.denumire}</option>)}</select></label>
           <label>Folosit pentru proiect din<input type="date" value={v.data_deschidere} onChange={e => set('data_deschidere', e.target.value)} /></label>
           <label>Sold în acea zi<input value={v.sold} onChange={e => set('sold', e.target.value)} placeholder="0" /></label>
           <label className="lat2">Denumire (opțional)<input value={v.denumire} onChange={e => set('denumire', e.target.value)} placeholder="ex. cont EUR proiect" /></label>
