@@ -148,7 +148,7 @@ export default function Banci() {
                       <td className="mono">v{f.versiune}</td>
                       <td>{f.denumire}{f.observatii && <div className="mic gri">{f.observatii}</div>}</td>
                       <td className="mic">{CITITOARE[f.structura.cititor] ?? f.structura.cititor}</td>
-                      <td className="mic">{f.structura.cititor === 'MT940' ? SOLD_DATA[f.structura.sold_initial_data ?? 'ziua_anterioara'] : f.structura.cititor === 'ING_PDF_V1' ? 'coloanele extrasului ING; soldul verificat după fiecare operațiune' : 'coloanele și antetul extrasului BCR'}</td>
+                      <td className="mic">{f.structura.cititor === 'MT940' ? SOLD_DATA[f.structura.sold_initial_data ?? 'ziua_anterioara'] : f.structura.cititor === 'ING_PDF_V1' ? 'coloanele extrasului ING; soldul verificat după fiecare operațiune' : f.structura.cititor === 'PATRIA_PDF_V1' ? 'coloanele extrasului Patria; soldul verificat după fiecare operațiune' : 'coloanele și antetul extrasului BCR'}</td>
                       <td className="nowrap">{f.valabil_de_la ? data(f.valabil_de_la) : '—'}</td>
                       <td><span className={`eticheta ${STARE[f.stare].cls}`}>{STARE[f.stare].text}{f.aprobat_la ? ` ${data(f.aprobat_la)}` : ''}</span></td>
                       <td className="n nowrap">
@@ -292,6 +292,7 @@ function FormFormat({ f, versiuneNoua, inchide, salveaza }: { f?: Format & { obs
       <label>Cititor<select value={v.cititor} onChange={e => set('cititor', e.target.value)}>{Object.entries(CITITOARE).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>
         {v.cititor === 'BCR_PDF_V1' && <span className="mic gri">Doar pentru extrasele PDF ale BCR.</span>}
         {v.cititor === 'ING_PDF_V1' && <span className="mic gri">Doar pentru extrasele PDF ING Business. Verifică soldul după fiecare operațiune.</span>}
+        {v.cititor === 'PATRIA_PDF_V1' && <span className="mic gri">Doar pentru extrasele PDF Patria Bank. Verifică soldul după fiecare operațiune.</span>}
         {v.cititor !== 'MT940' && <span className="mic gri">Pentru PDF-urile altor bănci e nevoie de un cititor nou, scris și testat într-o sesiune separată.</span>}</label>
       {v.cititor === 'MT940' && <label>Data soldului inițial<select value={v.sold} onChange={e => set('sold', e.target.value)}>{Object.entries(SOLD_DATA).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>
         <span className="mic gri">Hotărăște ziua de început a extrasului. Dacă proba arată prima zi greșit, schimbați setarea.</span></label>}
@@ -340,7 +341,7 @@ function BancaDinExtras({ banci, formate, renunta, deschide }: {
   const areFormat = (id: string, cititor: string) => formate.some(f => f.banca_id === id && f.structura.cititor === cititor && f.stare !== 'retrasa')
   const azi = new Date().toLocaleDateString('ro-RO')
 
-  function formatPropus(bancaId: string, denumire: string, cititor: 'MT940' | 'ING_PDF_V1') {
+  function formatPropus(bancaId: string, denumire: string, cititor: 'MT940' | 'ING_PDF_V1' | 'PATRIA_PDF_V1') {
     return {
       banca_id: bancaId, versiune: 1, tip_fisier: cititor === 'MT940' ? 'mt940' : 'pdf',
       denumire: cititor === 'MT940' ? `${denumire} – extras MT940` : `${denumire} – extras de cont PDF`,
@@ -349,7 +350,7 @@ function BancaDinExtras({ banci, formate, renunta, deschide }: {
     }
   }
 
-  async function adaugaFormat(b: Banca, cititor: 'MT940' | 'ING_PDF_V1') {
+  async function adaugaFormat(b: Banca, cititor: 'MT940' | 'ING_PDF_V1' | 'PATRIA_PDF_V1') {
     const { error } = await supabase.from('formate_extras').insert(formatPropus(b.id, b.denumire, cititor))
     if (error) return setEroare(error.message)
     await deschide(b.id, `Formatul „${CITITOARE[cititor]}” a fost adăugat la ${b.denumire} (propus). Proba de mai jos a pornit cu extrasul încărcat.`, 'verde', fisier ?? undefined)

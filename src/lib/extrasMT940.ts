@@ -186,7 +186,7 @@ export function clasificaGeneric(ops: OperatiuneCitita[], ibanPropriu: string, m
     else if (cod === 'INT' || /DOBAND/.test(d)) tip = 'dobanda'
     else if (cod === 'FEX' || /SCHIMB VALUTAR|VANZARE VALUTA|CUMPARARE VALUTA|\bFX\b/.test(d)) tip = 'schimb_valutar'
     else if (altIban && alProiectului(altIban, o.data_operatiune)) tip = 'transfer_intern'
-    else if (o.sens === 'debit' && /RETRAGERE NUMERAR|RETRAGERE DE NUMERAR|\bATM\b|CASH WITHDRAWAL/.test(d)) tip = 'retragere_numerar'
+    else if (o.sens === 'debit' && /RETRAGERE NUMERAR|RETRAGERE DE NUMERAR|RIDICARE NUMERAR|\bATM\b|CASH WITHDRAWAL/.test(d)) tip = 'retragere_numerar'
     else if (o.sens === 'credit' && /DEPUNERE NUMERAR|CASH DEPOSIT/.test(d)) tip = 'depunere_numerar'
     else if (o.sens === 'credit' && (cod === 'RTI' || /RETUR|RESTITUIRE|STORNARE|PLATA GRESITA/.test(d))) tip = 'restituire'
     else if (o.sens === 'debit' && /TREZORERI|BUGET|IMPOZIT|CONTRIBUTI|TIMBRU|ANAF/.test(d)) tip = 'plata_taxe'

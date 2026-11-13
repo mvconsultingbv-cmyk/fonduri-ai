@@ -7,6 +7,7 @@ import { textCuPozitii } from './pdfText'
 import { ePdf, textDinFisier } from './cititoare'
 import { citesteExtrasMT940, pareMT940 } from './extrasMT940'
 import { pareING } from './extrasING'
+import { parePatria } from './extrasPatria'
 
 export type Analiza = {
   tip: 'pdf' | 'mt940'
@@ -14,7 +15,7 @@ export type Analiza = {
   tara: string                 // primele 2 litere din IBAN
   cod: string | null           // codul băncii din IBAN (RO: caracterele 5–8)
   alteConturi: string[]        // un MT940 poate avea mai multe conturi
-  cititor: 'MT940' | 'ING_PDF_V1' | null  // cititorul existent potrivit pentru o bancă nouă; null = PDF fără cititor
+  cititor: 'MT940' | 'ING_PDF_V1' | 'PATRIA_PDF_V1' | null  // cititorul existent potrivit pentru o bancă nouă; null = PDF fără cititor
 }
 
 // Cifra de control a IBAN-ului (standardul ISO 13616, modulo 97)
@@ -79,7 +80,7 @@ export async function analizeazaExtras(f: File, buf: ArrayBuffer): Promise<Anali
     const toate = prima.length ? prima : ibanuriDinText(textOrdonat(el))
     if (!toate.length) throw new Error('Nu am găsit niciun IBAN valid în extras. Verificați că e un extras de cont descărcat din internet banking.')
     const iban = toate[0]
-    return { tip: 'pdf', iban, tara: iban.slice(0, 2), cod: cod(iban), alteConturi: [], cititor: pareING(el) ? 'ING_PDF_V1' : null }
+    return { tip: 'pdf', iban, tara: iban.slice(0, 2), cod: cod(iban), alteConturi: [], cititor: pareING(el) ? 'ING_PDF_V1' : parePatria(el) ? 'PATRIA_PDF_V1' : null }
   }
   const text = textDinFisier(buf)
   if (!pareMT940(text)) throw new Error('Fișierul nu e nici PDF, nici MT940.')
