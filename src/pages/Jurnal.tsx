@@ -46,6 +46,9 @@ const UNDE: Record<string, [string, string | null]> = {
   modificari_buget_linii: ['Linii de modificare de buget', 'buget'],
   pozitii_buget: ['Bugetul inițial', 'buget'],
   perioade_raportare: ['Perioade de raportare', 'raportare'],
+  rapoarte_depuse: ['Rapoarte depuse', 'raportare'],
+  raport_depus_linii: ['Sume declarate în raport', 'raportare'],
+  redeschideri_perioade: ['Redeschideri de perioade', 'raportare'],
   contracte: ['Datele contractului', ''],
   roluri_contract: ['Roluri pe contract', null],
   exceptii_contract: ['Excepții de la regulile programului', null],
@@ -139,6 +142,9 @@ function rezumat(t: string, r: Record<string, unknown> | null, h: Harti): string
     case 'avansuri_numerar': return `${scurt(r.titular_nume, 40)} · ${num(r.suma as number)} · termen ${v('termen_justificare')}`
     case 'roluri_contract': return `${v('utilizator_id')} · ${v('rol')}`
     case 'cheltuieli_indirecte': return `${num(r.suma as number)} · ${v('motiv')}${r.operatiune_id ? ` · ${h.operatiuni.get(String(r.operatiune_id)) ?? ''}` : ''}`
+    case 'rapoarte_depuse': return `depus la ${v('data_depunere')}${r.referinta ? ` · ${v('referinta')}` : ''}`
+    case 'raport_depus_linii': return `${v('pozitie_buget_id')} · declarat ${r.suma_declarata_eur == null ? '—' : num(r.suma_declarata_eur as number)}`
+    case 'redeschideri_perioade': return `motiv: ${v('motiv')}`
     case 'perioade_raportare': return `perioada ${r.numar ?? ''} · ${v('data_inceput')} – ${v('data_sfarsit')} · ${v('stare')}`
     case 'echipamente_plati': case 'reconcilieri': case 'justificari_avans': case 'alocari_lei':
       return `${num((r.suma ?? r.suma_lei) as number)}${r.operatiune_id ? ` · ${h.operatiuni.get(String(r.operatiune_id)) ?? ''}` : ''}`

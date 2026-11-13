@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { bani, curs, data, num, procent } from '../lib/format'
+import RaportDepus from './RaportDepus'
 
 // Raportare pe perioade: situația financiară pe capitole, în EUR, la cursul de referință al perioadei.
 // Calculul e făcut în baza de date (v_raport_perioade), pe aceleași reguli ca tabloul de bord:
@@ -34,6 +35,7 @@ export default function Raportare() {
   const [eroare, setEroare] = useState<string | null>(null)
   const [aleasa, setVedere] = useState<number | null>(null)
   const [pragCfs, setPragCfs] = useState<number | null>(null)
+  const [reincarca, setReincarca] = useState(0)
 
   useEffect(() => {
     if (!id) return
@@ -43,7 +45,7 @@ export default function Raportare() {
       if (error) setEroare('Datele nu au putut fi citite.')
       else setRanduri((d ?? []) as Rand[])
     })
-  }, [id])
+  }, [id, reincarca])
 
   const perioade = useMemo(() => {
     const m = new Map<number, Rand>()
@@ -106,7 +108,7 @@ export default function Raportare() {
         <div className="cifra accent"><div className="cifra-eticheta">Eligibil în perioadă</div><div className="cifra-valoare mic-v">{bani(t.eligibil, 'EUR')}</div><div className="cifra-sub">la cursul {curs(p.curs)}{p.provizoriu ? ' (provizoriu)' : ''}</div></div>
         <div className="cifra"><div className="cifra-eticheta">Din care neconfirmat</div><div className="cifra-valoare mic-v">{bani(t.neconf, 'EUR')}</div><div className="cifra-sub">{procent(pondereNeconf)} din total</div></div>
         <div className="cifra"><div className="cifra-eticheta">Cumulat de la început</div><div className="cifra-valoare mic-v">{bani(t.cumulat, 'EUR')}</div><div className="cifra-sub">{procent(t.buget ? (t.cumulat / t.buget) * 100 : 0)} din buget</div></div>
-        <div className="cifra"><div className="cifra-eticheta">Stare perioadă</div><div className="cifra-valoare mic-v">{p.stare === 'raportata' ? 'raportată' : inCurs ? 'în curs' : 'deschisă'}</div><div className="cifra-sub">{p.raportata_la ? `închisă la ${data(p.raportata_la.slice(0, 10))}` : 'datele se mai pot corecta'}</div></div>
+        <div className="cifra"><div className="cifra-eticheta">Stare perioadă</div><div className="cifra-valoare mic-v">{p.stare === 'raportata' ? 'închisă' : inCurs ? 'în curs' : 'deschisă'}</div><div className="cifra-sub">{p.raportata_la ? `din ${data(p.raportata_la.slice(0, 10))}, blocată` : 'datele se mai pot corecta'}</div></div>
       </section>
 
       {pragCfs != null && (t.buget >= pragCfs
@@ -117,7 +119,7 @@ export default function Raportare() {
       </div>}
       {p.provizoriu && <div className="alerta galben spatiu">Perioada e încă în curs: cursul de referință e media zilelor scurse până azi și se schimbă până la {data(p.data_sfarsit)}. Toate sumele convertite din lei se recalculează singure.</div>}
       {!p.provizoriu && p.stare !== 'raportata' && <div className="alerta albastru spatiu">
-        <b>Perioada s-a încheiat, dar nu e încă închisă în aplicație.</b> Dacă raportul ei a fost deja depus la finanțator, documentul depus se va putea încărca aici, iar ecranul va arăta diferențele pe fiecare capitol față de cifrele de mai jos. Abia după aceea perioada se închide; după închidere, nimic din ea nu se mai poate modifica.
+        <b>Perioada s-a încheiat, dar nu e încă închisă în aplicație.</b> După ce raportul ei a fost depus la finanțator, introduceți-l mai jos, în secțiunea „Raportul depus”: aplicația arată diferențele pe fiecare capitol. Abia apoi perioada se închide; după închidere, nimic din ea nu se mai poate modifica.
       </div>}
 
       <section className="bloc fara-padding">
@@ -155,8 +157,10 @@ export default function Raportare() {
 
       <div className="rand-butoane spatiu"><button className="buton" onClick={exportCsv}>Descarcă tabelul (CSV, se deschide în Excel)</button></div>
 
+      {id && <RaportDepus contractId={id} p={{ id: p.perioada_id, numar: p.perioada, stare: p.stare, data_sfarsit: p.data_sfarsit, raportata_la: p.raportata_la }} laSchimbare={() => setReincarca(x => x + 1)} />}
+
       <p className="nota">
-        Toate sumele sunt în EUR. Cheltuielile plătite în lei se transformă la cursul de referință al perioadei ({curs(p.curs)}), adică media zilnică BCE pe perioadă (regula din contract), nu la cursul băncii; diferența de curs se vede în ecranul <Link to={`/contract/${id}/schimburi`}>Schimburi valutare</Link>.
+        Toate sumele sunt în EUR. Cheltuielile plătite în lei se transformă la cursul de referință al perioadei ({curs(p.curs)}), calculat după regula de curs a programului, nu la cursul băncii; diferența de curs se vede în ecranul <Link to={`/contract/${id}/schimburi`}>Schimburi valutare</Link>.
         Echipamentele intră doar cu amortizarea lunilor scurse, nu cu prețul de cumpărare. Costurile indirecte (E) se calculează automat din costurile directe și nu au facturi proprii.
         Plățile intră în perioada în care au fost alocate pe capitol (de regulă, perioada în care s-a făcut plata).
       </p>
