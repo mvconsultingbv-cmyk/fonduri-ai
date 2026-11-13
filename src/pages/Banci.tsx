@@ -41,6 +41,7 @@ export default function Banci() {
   const [form, setForm] = useState<string | null>(null) // 'banca' | 'banca-noua' | 'format-nou' | 'fmt:<id>' | 'ver:<id>'
   const [mesaj, setMesaj] = useState<{ cls: string; text: string } | null>(null)
   const [eroare, setEroare] = useState<string | null>(null)
+  const [cuRetrase, setCuRetrase] = useState(false) // băncile retrase stau ascunse, ca lista să rămână curată
   const [fisierProba, setFisierProba] = useState<File | null>(null) // extrasul cu care s-a creat banca: proba pornește singură
 
   const incarca = useCallback(async () => {
@@ -51,7 +52,7 @@ export default function Banci() {
     ])
     if (b.error || f.error) { setEroare('Biblioteca nu a putut fi citită.'); return }
     setBanci(b.data as Banca[]); setFormate(f.data as Format[]); setConturi((c.data ?? []) as ContSumar[])
-    setAles(a => a ?? (b.data as Banca[])[0]?.id ?? null)
+    setAles(a => (a && (b.data as Banca[]).some(x => x.id === a) ? a : (b.data as Banca[]).find(x => x.stare !== 'retrasa')?.id ?? null))
   }, [])
   useEffect(() => { incarca() }, [incarca])
 
@@ -78,12 +79,13 @@ export default function Banci() {
       </section>
 
       <div className="file-vederi">
-        {banci.map(x => (
+        {banci.filter(x => cuRetrase || x.stare !== 'retrasa' || x.id === ales).map(x => (
           <button key={x.id} className={`fila ${x.id === ales ? 'activa' : ''}`} onClick={() => { setAles(x.id); setForm(null); setMesaj(null); setFisierProba(null) }}>
             {x.denumire} <span className={`eticheta ${STARE[x.stare].cls}`}>{STARE[x.stare].text}</span>
           </button>
         ))}
         <button className="fila" onClick={() => { setForm('din-extras'); setMesaj(null) }}>+ Bancă nouă din extras</button>
+        {banci.some(x => x.stare === 'retrasa') && <button className="buton-text" onClick={() => setCuRetrase(v => !v)}>{cuRetrase ? 'Ascunde băncile retrase' : `Arată și băncile retrase (${banci.filter(x => x.stare === 'retrasa').length})`}</button>}
         <button className="fila" onClick={() => { setForm('banca-noua'); setMesaj(null) }}>+ Bancă nouă (de mână)</button>
       </div>
       {mesaj && <div className={`alerta ${mesaj.cls}`}>{mesaj.text}</div>}
@@ -121,6 +123,8 @@ export default function Banci() {
                 {b.stare !== 'retrasa' && <button className="buton-text" onClick={() => setForm('banca')}>Modifică fișa</button>}
                 {b.stare === 'propusa' && <button className="buton" onClick={() => executa(supabase.from('banci').update({ stare: 'aprobata' }).eq('id', b.id), `Banca ${b.denumire} e aprobată. Aprobați acum și formatul ei de extras.`)}>Aprobă banca</button>}
                 {b.stare === 'aprobata' && aprobate === 0 && <button className="buton-text" onClick={() => executa(supabase.from('banci').update({ stare: 'propusa' }).eq('id', b.id), 'Aprobarea a fost anulată; banca e din nou propusă.')}>Anulează aprobarea</button>}
+                {b.stare === 'retrasa' && nrConturi === 0 && fmts.length === 0 && <button className="buton-text" onClick={() => { if (confirm(`Ștergeți definitiv fișa retrasă ${b.denumire}? Nu are conturi și nici formate de extras, deci nu se pierde niciun istoric. Ștergerea rămâne notată în jurnalul general.`)) executa(supabase.from('banci').delete().eq('id', b.id), `Fișa retrasă ${b.denumire} a fost ștearsă.`) }}>Șterge definitiv</button>}
+                {b.stare === 'retrasa' && (nrConturi > 0 || fmts.length > 0) && <span className="mic gri">Fișa rămâne pentru istoric: are {nrConturi} cont(uri) și {fmts.length} format(e) de extras.</span>}
                 {b.stare !== 'retrasa' && <button className="buton-text" onClick={() => { if (confirm(`Retrageți banca ${b.denumire}? Formatele ei se retrag și ele, iar extrasele ei nu se mai pot încărca. Retragerea nu se mai poate anula.`)) executa(supabase.from('banci').update({ stare: 'retrasa' }).eq('id', b.id), 'Banca a fost retrasă.') }}>Retrage</button>}
               </div>
             </>}
