@@ -4,12 +4,15 @@ import { supabase } from '../lib/supabase'
 import { data, iban as fmtIban, num } from '../lib/format'
 import { verifica } from '../lib/extrasBCR'
 import { CITITOARE, citesteFisier, type Citire, type Format } from '../lib/cititoare'
+import { analizeazaExtras, type Analiza } from '../lib/bancaDinExtras'
 
 // Biblioteca de bănci (doar administratorul): tot ce ține de o bancă stă aici, nu în cod.
 //  - Fișa băncii: denumire, cod BIC, țara și codul din IBAN (RO: caracterele 5–8, de ex. RNCB = BCR).
 //    După cod, aplicația recunoaște singură banca unui cont nou.
 //  - Formatele de extras: ce cititor folosește aplicația (PDF BCR sau MT940 standard) și setările lui.
 //  - Proba: un extras real se citește fără să se salveze nimic; dacă cifrele se potrivesc, formatul se aprobă.
+//  - Bancă nouă din extras: banca se află din IBAN-ul unui extras al ei, iar fișa se completează din registrul
+//    codurilor de bancă (listă de referință din baza de date). Intră tot ca propusă.
 // Clienții pot încărca extrase doar într-un format aprobat al băncii contului. Un format aprobat nu se
 // rescrie: se face o versiune nouă. Banca se aprobă înaintea formatelor ei.
 
@@ -38,6 +41,7 @@ export default function Banci() {
   const [form, setForm] = useState<string | null>(null) // 'banca' | 'banca-noua' | 'format-nou' | 'fmt:<id>' | 'ver:<id>'
   const [mesaj, setMesaj] = useState<{ cls: string; text: string } | null>(null)
   const [eroare, setEroare] = useState<string | null>(null)
+  const [fisierProba, setFisierProba] = useState<File | null>(null) // extrasul cu care s-a creat banca: proba pornește singură
 
   const incarca = useCallback(async () => {
     const [b, f, c] = await Promise.all([
@@ -75,11 +79,12 @@ export default function Banci() {
 
       <div className="file-vederi">
         {banci.map(x => (
-          <button key={x.id} className={`fila ${x.id === ales ? 'activa' : ''}`} onClick={() => { setAles(x.id); setForm(null); setMesaj(null) }}>
+          <button key={x.id} className={`fila ${x.id === ales ? 'activa' : ''}`} onClick={() => { setAles(x.id); setForm(null); setMesaj(null); setFisierProba(null) }}>
             {x.denumire} <span className={`eticheta ${STARE[x.stare].cls}`}>{STARE[x.stare].text}</span>
           </button>
         ))}
-        <button className="fila" onClick={() => { setForm('banca-noua'); setMesaj(null) }}>+ Bancă nouă</button>
+        <button className="fila" onClick={() => { setForm('din-extras'); setMesaj(null) }}>+ Bancă nouă din extras</button>
+        <button className="fila" onClick={() => { setForm('banca-noua'); setMesaj(null) }}>+ Bancă nouă (de mână)</button>
       </div>
       {mesaj && <div className={`alerta ${mesaj.cls}`}>{mesaj.text}</div>}
 
@@ -90,7 +95,12 @@ export default function Banci() {
         </section>
       )}
 
-      {b && form !== 'banca-noua' && <>
+      {form === 'din-extras' && (
+        <BancaDinExtras banci={banci} formate={formate} renunta={() => setForm(null)}
+          deschide={async (id, text, cls, fisier) => { setForm(null); await incarca(); setAles(id); setFisierProba(fisier ?? null); setMesaj({ cls, text }) }} />
+      )}
+
+      {b && form !== 'banca-noua' && form !== 'din-extras' && <>
         <section className="bloc">
           {form === 'banca'
             ? <FormBanca b={b} inchide={() => setForm(null)} salveaza={v => executa(supabase.from('banci').update(v).eq('id', b.id), 'Fișa băncii a fost actualizată.').then(() => {})} />
@@ -158,17 +168,19 @@ export default function Banci() {
           {form !== 'format-nou' && b.stare !== 'retrasa' && <div style={{ padding: '0 18px 18px' }}><button className="buton-text" onClick={() => setForm('format-nou')}>+ Adaugă un format</button></div>}
         </section>
 
-        {fmts.some(f => f.stare !== 'retrasa') && <Proba banca={b} formate={fmts.filter(f => f.stare !== 'retrasa')} conturi={conturi} />}
+        {fmts.some(f => f.stare !== 'retrasa') && <Proba key={`${b.id}-${fisierProba?.name ?? ''}`} banca={b} formate={fmts.filter(f => f.stare !== 'retrasa')} conturi={conturi} fisier={fisierProba} />}
       </>}
     </>
   )
 }
 
 // Proba: citește un extras real cu formatele băncii (și cele propuse), fără să salveze nimic.
-function Proba({ banca, formate, conturi }: { banca: Banca; formate: Format[]; conturi: ContSumar[] }) {
+function Proba({ banca, formate, conturi, fisier }: { banca: Banca; formate: Format[]; conturi: ContSumar[]; fisier?: File | null }) {
   const [rez, setRez] = useState<{ nume: string; citiri?: Citire[]; eroare?: string } | null>(null)
-  async function citeste(fl: FileList | null) {
-    const f = fl?.[0]; if (!f) return
+  // banca (sau formatul) tocmai creată dintr-un extras cu cititor existent: proba pornește singură, cu același fișier
+  useEffect(() => { if (fisier) citeste(fisier) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  async function citeste(f: File | undefined) {
+    if (!f) return
     setRez({ nume: f.name })
     try {
       const buf = await f.arrayBuffer()
@@ -183,7 +195,7 @@ function Proba({ banca, formate, conturi }: { banca: Banca; formate: Format[]; c
         <p>Alegeți un extras descărcat de la {banca.denumire}. Aplicația îl citește cu formatele de mai sus și arată ce a înțeles; <b>nu se salvează nimic</b>. Comparați soldurile și totalurile cu extrasul băncii: dacă se potrivesc la ban, formatul poate fi aprobat.</p>
       </div>
       <label className="zona-incarcare">
-        <input type="file" accept="application/pdf,.pdf,.sta,.txt,.940,.mt940,.mt9" onChange={e => { citeste(e.target.files); e.target.value = '' }} />
+        <input type="file" accept="application/pdf,.pdf,.sta,.txt,.940,.mt940,.mt9" onChange={e => { citeste(e.target.files?.[0]); e.target.value = '' }} />
         <span>Alege extrasul de probă (PDF sau MT940)</span>
         <span className="mic gri">Fișierul e citit doar pe calculatorul dvs.</span>
       </label>
@@ -228,8 +240,8 @@ function Proba({ banca, formate, conturi }: { banca: Banca; formate: Format[]; c
 }
 
 type VBanca = { denumire: string; cod_bic: string | null; tara: string; cod_iban: string | null; observatii: string | null }
-function FormBanca({ b, inchide, salveaza }: { b?: Banca; inchide: () => void; salveaza: (v: VBanca) => Promise<void> }) {
-  const [v, setV] = useState({ denumire: b?.denumire ?? '', cod_bic: b?.cod_bic ?? '', tara: b?.tara ?? 'RO', cod_iban: b?.cod_iban ?? '', observatii: b?.observatii ?? '' })
+function FormBanca({ b, initial, inchide, salveaza }: { b?: Banca; initial?: Partial<Record<keyof VBanca, string>>; inchide: () => void; salveaza: (v: VBanca) => Promise<void> }) {
+  const [v, setV] = useState({ denumire: b?.denumire ?? initial?.denumire ?? '', cod_bic: b?.cod_bic ?? initial?.cod_bic ?? '', tara: b?.tara ?? initial?.tara ?? 'RO', cod_iban: b?.cod_iban ?? initial?.cod_iban ?? '', observatii: b?.observatii ?? initial?.observatii ?? '' })
   const [eroare, setEroare] = useState<string | null>(null)
   const set = (k: keyof typeof v, x: string) => setV(s => ({ ...s, [k]: x }))
   function trimite() {
@@ -284,5 +296,115 @@ function FormFormat({ f, versiuneNoua, inchide, salveaza }: { f?: Format & { obs
       {eroare && <div className="alerta rosu">{eroare}</div>}
       <div className="rand-butoane"><button className="buton" onClick={trimite}>Salvează</button><button className="buton-text" onClick={inchide}>Renunță</button></div>
     </div>
+  )
+}
+
+
+type Registru = { tara: string; cod_iban: string; denumire: string; cod_bic: string | null; observatii: string | null; sursa: string }
+
+// Bancă nouă din extras: se încarcă un extras, aplicația află banca din IBAN și propune fișa ei.
+//  - banca e deja în bibliotecă → se deschide fișa ei (la MT940 se poate adăuga formatul, dacă lipsește);
+//  - banca e nouă → fișa se completează din registrul codurilor de bancă și se salvează ca propusă;
+//    la MT940 se propune și formatul MT940, iar proba pornește imediat cu același fișier;
+//    la un PDF fără cititor se creează doar fișa băncii, cu mesaj clar că trebuie scris un cititor nou.
+function BancaDinExtras({ banci, formate, renunta, deschide }: {
+  banci: Banca[]; formate: Format[]; renunta: () => void
+  deschide: (id: string, text: string, cls: string, fisier?: File) => Promise<void>
+}) {
+  const [fisier, setFisier] = useState<File | null>(null)
+  const [an, setAn] = useState<Analiza | null>(null)
+  const [reg, setReg] = useState<Registru | null>(null)
+  const [eroare, setEroare] = useState<string | null>(null)
+  const [lucru, setLucru] = useState(false)
+
+  async function citeste(f: File | undefined) {
+    if (!f) return
+    setFisier(f); setAn(null); setReg(null); setEroare(null); setLucru(true)
+    try {
+      const a = await analizeazaExtras(f, await f.arrayBuffer())
+      if (a.cod) {
+        const { data: r } = await supabase.from('registru_coduri_banci').select('*').eq('tara', a.tara).eq('cod_iban', a.cod).maybeSingle()
+        setReg((r as Registru | null) ?? null)
+      }
+      setAn(a)
+    } catch (e) { setEroare(e instanceof Error ? e.message : String(e)) }
+    setLucru(false)
+  }
+
+  const existenta = an?.cod ? banci.find(x => x.tara === an.tara && x.cod_iban === an.cod && x.stare !== 'retrasa') : undefined
+  const retrasa = an?.cod ? banci.find(x => x.tara === an.tara && x.cod_iban === an.cod && x.stare === 'retrasa') : undefined
+  const areFormat = (id: string, cititor: string) => formate.some(f => f.banca_id === id && f.structura.cititor === cititor && f.stare !== 'retrasa')
+  const azi = new Date().toLocaleDateString('ro-RO')
+
+  function formatPropus(bancaId: string, denumire: string, cititor: 'MT940' | 'ING_PDF_V1') {
+    return {
+      banca_id: bancaId, versiune: 1, tip_fisier: cititor === 'MT940' ? 'mt940' : 'pdf',
+      denumire: cititor === 'MT940' ? `${denumire} – extras MT940` : `${denumire} – extras de cont PDF`,
+      structura: cititor === 'MT940' ? { cititor, sold_initial_data: 'ziua_anterioara' } : { cititor },
+      observatii: `Propus din extrasul „${fisier?.name}” (${azi}). Faceți proba și verificați soldurile înainte de aprobare.`,
+    }
+  }
+
+  async function adaugaFormat(b: Banca, cititor: 'MT940' | 'ING_PDF_V1') {
+    const { error } = await supabase.from('formate_extras').insert(formatPropus(b.id, b.denumire, cititor))
+    if (error) return setEroare(error.message)
+    await deschide(b.id, `Formatul „${CITITOARE[cititor]}” a fost adăugat la ${b.denumire} (propus). Proba de mai jos a pornit cu extrasul încărcat.`, 'verde', fisier ?? undefined)
+  }
+
+  async function creeaza(v: VBanca) {
+    if (!an) return
+    const { data: nou, error } = await supabase.from('banci').insert(v).select('id,denumire').single()
+    if (error || !nou) return setEroare(error?.message ?? 'Banca nu a putut fi salvată.')
+    if (an.cititor) {
+      const { error: e2 } = await supabase.from('formate_extras').insert(formatPropus(nou.id, nou.denumire, an.cititor))
+      if (e2) return deschide(nou.id, `Banca ${nou.denumire} a fost adăugată (propusă), dar formatul nu: ${e2.message}`, 'galben')
+      return deschide(nou.id, `Banca ${nou.denumire} și formatul „${CITITOARE[an.cititor]}” au fost adăugate ca propuse. Proba a pornit cu extrasul încărcat: dacă soldurile și totalurile se potrivesc la ban, aprobați întâi banca, apoi formatul.`, 'verde', fisier ?? undefined)
+    }
+    await deschide(nou.id, `Banca ${nou.denumire} a fost adăugată (propusă). Extrasele ei PDF nu se pot citi încă: aplicația nu are un cititor pentru acest PDF. Dacă banca exportă MT940, adăugați formatul MT940 și faceți proba. Altfel, cititorul PDF se scrie și se testează pe un extras real, într-o sesiune Fonduri-AI separată.`, 'galben')
+  }
+
+  return (
+    <section className="bloc">
+      <div className="bloc-titlu">
+        <h2>Bancă nouă din extras</h2>
+        <p>Alegeți un extras de cont al băncii (PDF sau MT940). Aplicația află banca din IBAN și completează fișa ei, care intră ca <b>propusă</b>: o aprobați după probă. Fișierul e citit doar pe calculatorul dvs. și nu se salvează.</p>
+      </div>
+      <label className="zona-incarcare">
+        <input type="file" accept="application/pdf,.pdf,.sta,.txt,.940,.mt940,.mt9" onChange={e => { citeste(e.target.files?.[0]); e.target.value = '' }} />
+        <span>Alege extrasul (PDF sau MT940)</span>
+        <span className="mic gri">De preferat descărcat direct din internet banking, nu scanat.</span>
+      </label>
+      {lucru && <div className="gol">Citesc {fisier?.name}…</div>}
+      {eroare && <div className="alerta rosu" style={{ marginTop: 12 }}>{fisier ? `${fisier.name}: ` : ''}{eroare}</div>}
+
+      {an && <div style={{ marginTop: 16 }}>
+        <ul className="mic">
+          <li className="verde-text">✓ Contul extrasului: <span className="mono">{fmtIban(an.iban)}</span> (cifra de control a IBAN-ului e corectă)</li>
+          <li>{an.cod ? <>Codul băncii din IBAN: <b className="mono">{an.cod}</b></> : <>IBAN din țara {an.tara}: banca se completează de mână.</>}</li>
+          <li>Tip fișier: {an.tip === 'mt940' ? 'MT940' : 'PDF'}{an.cititor ? ` · aplicația are cititor: ${CITITOARE[an.cititor]}` : ' · aplicația nu are încă un cititor pentru acest PDF'}</li>
+          {an.alteConturi.length > 0 && <li>⚠ Fișierul mai are {an.alteConturi.length} cont(uri): {an.alteConturi.map(fmtIban).join(', ')}. Se folosește primul.</li>}
+        </ul>
+
+        {existenta ? <>
+          <div className="alerta galben" style={{ marginTop: 10 }}>Banca {existenta.denumire} ({existenta.cod_iban}) e deja în bibliotecă, {STARE[existenta.stare].text}.
+            {an.cititor && !areFormat(existenta.id, an.cititor) ? ` Nu are încă un format „${CITITOARE[an.cititor]}”.` : ''}</div>
+          <div className="rand-butoane" style={{ marginTop: 10 }}>
+            {an.cititor && !areFormat(existenta.id, an.cititor) && <button className="buton" onClick={() => adaugaFormat(existenta, an.cititor!)}>Adaugă formatul și fă proba</button>}
+            <button className={an.cititor && !areFormat(existenta.id, an.cititor) ? 'buton-text' : 'buton'} onClick={() => deschide(existenta.id, `Fișa băncii ${existenta.denumire}.`, 'verde', an.cititor && areFormat(existenta.id, an.cititor) ? fisier ?? undefined : undefined)}>Deschide fișa băncii</button>
+            <button className="buton-text" onClick={renunta}>Renunță</button>
+          </div>
+        </> : <>
+          {retrasa && <div className="alerta galben" style={{ marginTop: 10 }}>{retrasa.denumire} a fost retrasă din bibliotecă. Se adaugă acum ca bancă nouă, propusă; fișa veche rămâne retrasă, pentru istoric.</div>}
+          {an.cod && !reg && <div className="alerta galben" style={{ marginTop: 10 }}>Codul {an.cod} nu e în registrul de referință. Completați denumirea și BIC-ul de pe extras sau de pe site-ul băncii.</div>}
+          {reg?.observatii && <div className="alerta galben" style={{ marginTop: 10 }}>Notă din registru: {reg.observatii}</div>}
+          {!an.cititor && <div className="alerta galben" style={{ marginTop: 10 }}>Aplicația nu are încă un cititor pentru PDF-ul acestei bănci. Se creează doar fișa băncii; extrasele ei se vor putea încărca după ce adăugați un format MT940 (dacă banca îl exportă) sau după ce se scrie un cititor PDF nou.</div>}
+          <h3 style={{ margin: '16px 0 8px' }}>Fișa propusă{reg ? ` (din registrul codurilor de bancă: ${reg.sursa})` : ''}</h3>
+          <FormBanca key={an.iban} inchide={renunta} salveaza={creeaza} initial={{
+            denumire: reg?.denumire ?? '', cod_bic: reg?.cod_bic ?? '', tara: an.tara, cod_iban: an.cod ?? '',
+            observatii: `Adăugată din extrasul „${fisier?.name}” (${azi}), cont ${fmtIban(an.iban)}.`,
+          }} />
+        </>}
+      </div>}
+    </section>
   )
 }
